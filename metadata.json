@@ -1,0 +1,8 @@
+{
+  "name": "Quán 93 Full",
+  "description": "Hệ thống đặt món ăn trực tuyến của Bếp Việt, hỗ trợ đặt hàng nhanh qua Zalo, ghi nhớ thông tin khách hàng và có trang quản trị đơn hàng, sản phẩm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

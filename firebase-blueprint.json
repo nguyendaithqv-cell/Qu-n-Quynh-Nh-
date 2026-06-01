@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Category for dishes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "sortOrder": { "type": "number" },
+        "type": { "type": "string", "enum": ["food", "drink"] }
+      },
+      "required": ["id", "name", "icon"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Dish in the menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "price": { "type": "number" },
+        "cost": { "type": "number" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "isAvailable": { "type": "boolean" }
+      },
+      "required": ["id", "name", "categoryId", "price", "image", "description", "isAvailable"]
+    },
+    "Promotion": {
+      "title": "Promotion",
+      "description": "Discount coupon code",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "value": { "type": "number" },
+        "minOrderValue": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "maxUsageCount": { "type": "number" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" }
+      },
+      "required": ["id", "code", "type", "value", "minOrderValue", "isActive"]
+    },
+    "StoreConfig": {
+      "title": "StoreConfig",
+      "description": "Configuration metadata of the store",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "zaloHotline": { "type": "string" },
+        "bankName": { "type": "string" },
+        "bankAccount": { "type": "string" },
+        "bankAccountName": { "type": "string" },
+        "openHours": { "type": "string" },
+        "customQrCodeUrl": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "theme": { "type": "string", "enum": ["standard", "vista", "cyberpunk", "win11"] }
+      },
+      "required": ["name", "address", "phone", "zaloHotline", "bankName", "bankAccount", "bankAccountName", "openHours"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Placed food order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "billCode": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerAddress": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "subTotal": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "promoCodeUsed": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "preparing", "delivering", "completed", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "paid", "debt"] },
+        "createdAt": { "type": "string" },
+        "note": { "type": "string" },
+        "adminNote": { "type": "string" },
+        "cancellationReason": { "type": "string" },
+        "items": { "type": "array" }
+      },
+      "required": ["id", "billCode", "customerName", "customerPhone", "customerAddress", "paymentMethod", "subTotal", "discountAmount", "totalAmount", "status", "paymentStatus", "createdAt", "items"]
+    }
+  },
+  "firestore": {
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of menu categories"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of menu dishes"
+    },
+    "/promotions/{promotionId}": {
+      "schema": "Promotion",
+      "description": "Collection of discount coupons"
+    },
+    "/storeConfig/{docId}": {
+      "schema": "StoreConfig",
+      "description": "Store configuration document"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer placed orders"
+    }
+  }
+}
