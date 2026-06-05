@@ -361,6 +361,34 @@ export default function MobileSimulator({
       subtextClass2: 'text-[9px] text-zinc-400',
       divider: 'border-zinc-200',
       statusCardBg: 'bg-white border border-zinc-200'
+    },
+    aura2026: {
+      pageWrapper: 'w-full h-full flex flex-col bg-[#fdfafc] relative text-[#4a3f5f] font-sans',
+      headerBg: 'pt-6 pb-4 px-5 bg-white/90 backdrop-blur-sm border-b border-[#e1d5e7] z-10 shadow-xs',
+      logoText: 'text-[#4a3f5f] font-bold text-xl tracking-tight block uppercase',
+      logoSubtext: 'text-[10px] text-[#9b6bcc] uppercase font-bold tracking-widest block',
+      logoLetterBg: 'bg-[#9b6bcc] text-white shadow-md font-bold',
+      textMuted: 'text-[10px] font-semibold text-[#a28da8] tracking-wider uppercase',
+      tableBadge: 'bg-[#eadef5] text-[#6d5b7a] border border-[#d3bce3]/50 font-bold px-2 py-0.5 rounded-full text-[9px] uppercase tracking-wider',
+      textMain: 'text-[#4a3f5f]',
+      titleText: 'text-[#4a3f5f] font-bold',
+      card: 'bg-white p-3 rounded-3xl shadow-sm border border-[#e1d5e7] hover:border-[#9b6bcc]/50 transition-all flex gap-3',
+      badge: 'bg-[#eadef5] text-[#6d5b7a] border border-[#d3bce3]/50 font-bold',
+      accentText: 'text-[#9b6bcc] font-bold',
+      btnAccent: 'px-2.5 py-1 bg-[#9b6bcc] hover:bg-[#8a5dc8] text-white font-bold rounded-full',
+      btnAccentLg: 'w-full py-3 bg-[#9b6bcc] hover:bg-[#8a5dc8] text-white font-bold rounded-2xl shadow-sm transition-all uppercase tracking-wider',
+      btnSec: 'bg-white hover:bg-[#fcf9fc] text-[#6d5b7a] font-bold border border-[#d3bce3] rounded-full',
+      tabActive: 'bg-[#eadcf2] text-[#5e4776] shadow-sm rounded-full',
+      tabInactive: 'bg-transparent text-[#8d799f] hover:text-[#5e4776]',
+      input: 'w-full bg-white border border-[#d3bce3] text-[#4a3f5f] focus:ring-1 focus:ring-[#9b6bcc] rounded-2xl',
+      iconBg: 'bg-[#f4edf7] text-[#9b6bcc] border border-[#e1d5e7]',
+      cartBadge: 'bg-[#9b6bcc] text-white',
+      searchIcon: 'text-[#a28da8]',
+      menuBg: 'bg-transparent',
+      subtextClass: 'text-[9px] text-[#9b6bcc] font-bold uppercase',
+      subtextClass2: 'text-[9px] text-[#a28da8]',
+      divider: 'border-[#e1d5e7]',
+      statusCardBg: 'bg-white border border-[#e1d5e7]'
     }
   };
 

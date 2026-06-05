@@ -1012,6 +1012,31 @@ export default function AdminPanel({
       titleSpin: 'text-[#0078d4] animate-pulse',
       panelTitle: `Trang Quản Lý - ${storeConfig.name || 'Cửa Hàng'}`,
       subText: 'Thông số hệ thống (Mica View)'
+    },
+    aura2026: {
+      pageWrapper: 'flex-1 overflow-y-auto px-6 py-6 font-sans text-[#4a3f5f] bg-[#fdfafc] relative overflow-x-hidden',
+      titleBar: 'text-[#4a3f5f] border-b border-[#e1d5e7] pb-3',
+      textClass: 'text-[#4a3f5f] font-sans',
+      textMuted: 'text-[#a28da8] font-semibold uppercase tracking-wider text-[10px]',
+      textTitle: 'text-[#3d2c4e] font-bold tracking-tight pb-1',
+      card: 'bg-white/90 backdrop-blur-sm border border-[#e1d5e7] shadow-[0_2px_10px_rgba(150,120,180,0.1)] rounded-3xl hover:shadow-[0_8px_20px_rgba(150,120,180,0.2)] transition-all duration-300 overflow-hidden',
+      cardSec: 'bg-[#f4edf7]/70 border border-[#e1d5e7] rounded-3xl p-4 shadow-inner',
+      btnAccent: 'bg-[#9b6bcc] hover:bg-[#8a5dc8] text-white shadow-[0_4px_10px_rgba(150,100,200,0.3)] border border-[#8a5dc8] transition-all pb-2 pt-2 px-4 rounded-full text-xs uppercase tracking-wider font-bold',
+      btnSec: 'bg-white hover:bg-[#fcf9fc] text-[#6d5b7a] border border-[#e1d5e7] font-medium pb-2 pt-2 px-4 rounded-full shadow-xs transition-all uppercase text-[10px]',
+      tabActive: 'bg-[#eadcf2] border border-[#c6a8d6] text-[#5e4776] font-bold shadow-sm rounded-full',
+      tabInactive: 'text-[#8d799f] hover:text-[#5e4776] hover:bg-[#f6effa] rounded-full',
+      tabContainer: 'flex gap-1 border-b border-[#e1d5e7] mb-6 bg-[#f8f5fa] p-1.5 rounded-full font-semibold text-xs overflow-x-auto no-scrollbar',
+      tableHeader: 'bg-[#fefafc] text-[#6d5b7a] font-semibold border-b border-[#e1d5e7]',
+      tableHeaderCell: 'hover:bg-[#f6effa] text-[#5e4776] cursor-pointer p-3 border-r border-[#e1d5e7]',
+      tableRow: 'hover:bg-[#f6effa]/50 even:bg-[#faf7fb]/50 odd:bg-white transition-all',
+      tableCellBorder: 'border-[#e1d5e7] border-r',
+      badge: 'bg-[#eadef5] border border-[#d3bce3]/50 text-[#6d5b7a] font-semibold text-[10px] px-2.5 py-0.5 rounded-full inline-block',
+      input: 'bg-white border border-[#d3bce3] focus:border-[#9b6bcc] focus:ring-1 focus:ring-[#9b6bcc] rounded-2xl px-3 py-2 text-[#4a3f5f] outline-none shadow-xs',
+      icon: 'text-[#9b6bcc]',
+      divider: 'border-[#e1d5e7]',
+      titleSpin: 'text-[#9b6bcc] animate-spin-slow',
+      panelTitle: `Trang Quản Lý Aura - ${storeConfig.name || 'Cửa Hàng'}`,
+      subText: 'Thống số tổng quan (Aura Style)'
     }
   };
 
@@ -4264,6 +4289,33 @@ export default function AdminPanel({
                     adminTheme === 'win11' ? 'bg-[#0078d4] text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
                     {adminTheme === 'win11' ? '✓ Đang dùng' : 'Sử dụng'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 5: Aura 2026 theme */}
+              <div 
+                onClick={() => handleThemeChange('aura2026')}
+                className={`border rounded-xl p-4 cursor-pointer transition-all duration-300 relative group flex flex-col justify-between min-h-[140px] ${
+                  adminTheme === 'aura2026' 
+                    ? 'border-[#9b6bcc] bg-[#eadcf2]/40 ring-1 ring-[#9b6bcc] shadow-md' 
+                    : 'border-slate-205 bg-white hover:border-slate-350 hover:shadow-xs'
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] bg-[#eadcf2] text-[#9b6bcc] font-black px-2 py-0.5 rounded uppercase tracking-wider">Aura 2026</span>
+                    <span className="text-xl">✨</span>
+                  </div>
+                  <h4 className="font-extrabold text-[#5e4776] text-[11px] uppercase tracking-wide">Aura Future</h4>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Giao diện Neomorphic pastel, nhẹ nhàng, bay bổng, xu hướng 2026 mới nhất.</p>
+                </div>
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100/60">
+                  <span className="text-[9px] text-[#9b6bcc] font-bold font-sans">Aura Pastel</span>
+                  <button className={`px-2.5 py-1 text-[9px] font-black uppercase rounded ${
+                    adminTheme === 'aura2026' ? 'bg-[#9b6bcc] text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {adminTheme === 'aura2026' ? '✓ Đang dùng' : 'Sử dụng'}
                   </button>
                 </div>
               </div>

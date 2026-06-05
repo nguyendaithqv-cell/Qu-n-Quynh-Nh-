@@ -103,7 +103,7 @@ export interface StoreConfig {
   openHours: string;
   customQrCodeUrl?: string;
   logoUrl?: string;
-  theme?: 'standard' | 'vista' | 'cyberpunk' | 'win11';
+  theme?: 'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026';
   useDynamicQrAmount?: boolean;
   adminPin?: string;
   staff?: Staff[];
