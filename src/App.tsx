@@ -659,6 +659,8 @@ export default function App() {
               categories={categories}
               promotions={promotions}
               storeConfig={storeConfig}
+              tables={tables}
+              onUpdateTables={handleUpdateTables}
               onAddOrder={handleAddOrder}
               isStandaloneMobile={true}
               onToggleAdminView={() => setMobileMode('admin')}
