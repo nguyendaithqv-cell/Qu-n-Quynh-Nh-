@@ -3822,7 +3822,7 @@ export default function AdminPanel({
 
       {/* 7. REPORT VIEW */}
       {activeTab === 'report' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-fade-in text-xs">
+        <div className="animate-fade-in text-xs">
           <ReportSection products={products} orders={orders} categories={categories} storeConfig={storeConfig} />
         </div>
       )}

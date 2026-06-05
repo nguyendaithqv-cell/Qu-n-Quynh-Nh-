@@ -232,56 +232,56 @@ export default function ReportSection({ products, orders, categories, storeConfi
   };
 
   return (
-    <div className="relative font-sans text-slate-800 bg-white p-6 rounded-3xl overflow-hidden border border-slate-200 shadow-sm space-y-6">
+    <div className="relative font-sans text-slate-800 bg-white w-full py-4 xs:py-6 space-y-4 xs:space-y-6">
       
       {/* HEADER WITH EXCEL EXPORT */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3 xs:pb-4">
         <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-sky-600" />
+          <h2 className="text-lg xs:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 xs:w-6 xs:h-6 text-sky-600" />
             BÁO CÁO KINH DOANH
           </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Dữ liệu được cập nhật theo thời gian thực</p>
+          <p className="text-[10px] xs:text-xs text-slate-500 font-medium mt-0.5">Dữ liệu được cập nhật theo thời gian thực</p>
         </div>
 
         <button
           onClick={exportToExcel}
           type="button"
-          className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-200 transition-all uppercase text-xs tracking-wider select-none shrink-0"
+          className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 xs:px-6 py-2 xs:py-2.5 rounded-xl shadow-lg shadow-emerald-200 transition-all uppercase text-[10px] xs:text-xs tracking-wider select-none shrink-0"
         >
-          <FileSpreadsheet className="w-4 h-4" /> 
+          <FileSpreadsheet className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> 
           <span>Xuất Báo Cáo Excel</span>
         </button>
       </div>
 
       {/* FILTER BAR SECTION */}
-      <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-slate-50 border border-slate-200 p-3 xs:p-5 rounded-2xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center border border-sky-200">
-              <Clock className="w-5 h-5 text-sky-600" />
+            <div className="w-9 h-9 xs:w-10 xs:h-10 rounded-xl bg-sky-100 flex items-center justify-center border border-sky-200 shrink-0">
+              <Clock className="w-4 h-4 xs:w-5 xs:h-5 text-sky-600" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Bộ lọc thời gian</h4>
-              <p className="text-[10px] text-slate-400 font-bold uppercase font-mono">Lọc dữ liệu theo chu kỳ</p>
+              <h4 className="font-bold text-slate-700 text-xs xs:text-sm uppercase tracking-wide">Bộ lọc thời gian</h4>
+              <p className="text-[9px] xs:text-[10px] text-slate-400 font-bold uppercase font-mono">Lọc dữ liệu theo chu kỳ</p>
             </div>
           </div>
           
-          <div className="flex items-center flex-wrap gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 -mx-3 px-3 lg:mx-0 lg:px-0 lg:pb-0 no-scrollbar scroll-smooth">
             {[
               { key: 'all', label: 'Tất cả' },
               { key: 'today', label: 'Hôm nay' },
               { key: 'yesterday', label: 'Hôm qua' },
-              { key: '7days', label: '7 ngày qua' },
+              { key: '7days', label: '7 ngày' },
               { key: 'month_this', label: 'Tháng này' },
               { key: 'month_last', label: 'Tháng trước' },
-              { key: 'custom', label: 'Tùy chọn...' },
+              { key: 'custom', label: 'Tùy chọn' },
             ].map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setTimeRange(p.key as TimeRangeType)}
-                className={`text-[11px] font-bold uppercase px-4 py-2.5 rounded-xl transition-all border ${
+                className={`text-[10px] xs:text-[11px] font-bold uppercase px-3.5 py-2 rounded-xl transition-all border whitespace-nowrap shrink-0 ${
                   timeRange === p.key
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-200 border-sky-600'
                     : 'bg-white text-slate-600 hover:text-slate-900 border-slate-200 hover:border-slate-300'
@@ -295,23 +295,23 @@ export default function ReportSection({ products, orders, categories, storeConfi
 
         {/* CUSTOM DATES CONTAINER */}
         {timeRange === 'custom' && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-5 mt-4 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 mt-3 border-t border-slate-200">
             <div className="flex items-center gap-3 flex-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase w-20 shrink-0">Từ ngày:</span>
+              <span className="text-[10px] xs:text-[11px] font-bold text-slate-500 uppercase w-16 xs:w-20 shrink-0">Từ ngày:</span>
               <div className="relative flex-1">
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   max={endDate || todayStr}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 pl-10 font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 pl-8 font-mono"
                 />
-                <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
               </div>
             </div>
             
             <div className="flex items-center gap-3 flex-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase w-20 shrink-0">Đến ngày:</span>
+              <span className="text-[10px] xs:text-[11px] font-bold text-slate-500 uppercase w-16 xs:w-20 shrink-0">Đến ngày:</span>
               <div className="relative flex-1">
                 <input
                   type="date"
@@ -319,9 +319,9 @@ export default function ReportSection({ products, orders, categories, storeConfi
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   max={todayStr}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 pl-10 font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 pl-8 font-mono"
                 />
-                <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
               </div>
             </div>
           </div>
@@ -329,86 +329,88 @@ export default function ReportSection({ products, orders, categories, storeConfi
       </div>
 
       {/* STATISTICS CARDS */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-4 xs:gap-6">
         
         {/* TOTAL SUMMARY CARD */}
-        <div className="group relative rounded-3xl border-2 border-sky-600 bg-sky-50/50 p-8 transition-all">
-          <div className="flex justify-between items-center mb-6">
+        <div className="group relative rounded-2xl xs:rounded-3xl border-2 border-sky-600 bg-sky-50/50 p-4 xs:p-6 transition-all">
+          <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="font-black text-sky-900 uppercase text-lg tracking-widest flex items-center gap-3">
-                <TrendingUp className="w-6 h-6 text-sky-600" /> TỔNG THỐNG KÊ KINH DOANH
+              <h3 className="font-black text-sky-900 uppercase text-sm xs:text-base tracking-wider flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-sky-600" /> TỔNG THỐNG KÊ KINH DOANH
               </h3>
-              <p className="text-xs text-sky-600 font-bold uppercase mt-1">Tổng cộng (Đồ ăn + Đồ uống)</p>
+              <p className="text-[10px] text-sky-600 font-bold uppercase mt-0.5">Tổng cộng (Món ăn + Đồ uống)</p>
             </div>
-            <div className="p-3 rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-200">
-              <TrendingUp className="w-8 h-8" />
+            <div className="p-2 xs:p-3 rounded-xl xs:rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-200 shrink-0">
+              <TrendingUp className="w-5 h-5 xs:w-6 xs:h-6" />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white/60 p-5 rounded-2xl border border-sky-100 shadow-sm">
-              <p className="text-xs text-slate-500 font-black uppercase tracking-widest mb-1">Tổng Doanh Thu</p>
-              <p className="font-mono font-black text-slate-900 text-3xl">
-                {reportData.totals.grand.revenue.toLocaleString('vi-VN')} <span className="text-sm font-bold text-slate-400">đ</span>
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white/60 p-4 rounded-xl border border-sky-100 shadow-sm">
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Tổng Doanh Thu</p>
+              <div className="font-mono font-black text-slate-900 text-lg xs:text-2xl flex items-baseline gap-1 flex-wrap">
+                <span>{reportData.totals.grand.revenue.toLocaleString('vi-VN')}</span>
+                <span className="text-xs font-bold text-slate-400">đ</span>
+              </div>
             </div>
-            <div className="bg-emerald-600 p-5 rounded-2xl shadow-lg shadow-emerald-100">
-              <p className="text-xs text-emerald-100 font-black uppercase tracking-widest mb-1">Tổng Lợi Nhuận</p>
-              <p className="font-mono font-black text-white text-3xl">
-                {reportData.totals.grand.profit.toLocaleString('vi-VN')} <span className="text-sm font-bold text-emerald-200">đ</span>
-              </p>
+            <div className="bg-emerald-600 p-4 rounded-xl shadow-lg shadow-emerald-100">
+              <p className="text-[10px] text-emerald-100 font-black uppercase tracking-widest mb-0.5">Tổng Lợi Nhuận</p>
+              <div className="font-mono font-black text-white text-lg xs:text-2xl flex items-baseline gap-1 flex-wrap">
+                <span>{reportData.totals.grand.profit.toLocaleString('vi-VN')}</span>
+                <span className="text-xs font-bold text-emerald-200">đ</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xs:gap-6">
           {/* FOODS CARD */}
-          <div className="group relative rounded-3xl border border-emerald-100 bg-white p-6 transition-all hover:shadow-md">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="font-bold text-emerald-900 uppercase text-sm tracking-wider flex items-center gap-2">
-                <span className="text-xl">🥗</span> THỐNG KÊ MÓN ĂN
+          <div className="group relative rounded-2xl xs:rounded-3xl border border-emerald-100 bg-white p-4 xs:p-5 transition-all hover:shadow-md">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-bold text-emerald-900 uppercase text-[11px] xs:text-xs tracking-wider flex items-center gap-1.5">
+                <span className="text-lg">🥗</span> THỐNG KÊ MÓN ĂN
               </h3>
-              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-600">
-                <Sparkles className="w-5 h-5" />
+              <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 shrink-0">
+                <Sparkles className="w-4 h-4" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Doanh thu</p>
-                <p className="font-mono font-black text-slate-800 text-xl mt-1">
-                  {reportData.totals.food.revenue.toLocaleString('vi-VN')} <span className="text-xs font-bold text-slate-300">đ</span>
-                </p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center border-b border-dashed border-slate-100 pb-1.5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Doanh thu:</span>
+                <span className="font-mono font-bold text-slate-800 text-sm xs:text-base">
+                  {reportData.totals.food.revenue.toLocaleString('vi-VN')} <span className="text-[10px] text-slate-400 font-medium">đ</span>
+                </span>
               </div>
-              <div>
-                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Lợi nhuận</p>
-                <p className="font-mono font-black text-emerald-600 text-xl mt-1">
-                  {reportData.totals.food.profit.toLocaleString('vi-VN')} <span className="text-xs font-bold">đ</span>
-                </p>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-emerald-600 font-bold uppercase">Lợi nhuận:</span>
+                <span className="font-mono font-black text-emerald-600 text-sm xs:text-base">
+                  {reportData.totals.food.profit.toLocaleString('vi-VN')} <span className="text-[10px]">đ</span>
+                </span>
               </div>
             </div>
           </div>
 
           {/* DRINKS CARD */}
-          <div className="group relative rounded-3xl border border-sky-100 bg-white p-6 transition-all hover:shadow-md">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="font-bold text-sky-900 uppercase text-sm tracking-wider flex items-center gap-2">
-                <span className="text-xl">🍺</span> THỐNG KÊ ĐỒ UỐNG
+          <div className="group relative rounded-2xl xs:rounded-3xl border border-sky-100 bg-white p-4 xs:p-5 transition-all hover:shadow-md">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-bold text-sky-900 uppercase text-[11px] xs:text-xs tracking-wider flex items-center gap-1.5">
+                <span className="text-lg">🍺</span> THỐNG KÊ ĐỒ UỐNG
               </h3>
-              <div className="p-2 rounded-xl bg-sky-100 text-sky-600">
-                <Info className="w-5 h-5" />
+              <div className="p-1.5 rounded-lg bg-sky-100 text-sky-600 shrink-0">
+                <Info className="w-4 h-4" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Doanh thu</p>
-                <p className="font-mono font-black text-slate-800 text-xl mt-1">
-                  {reportData.totals.drink.revenue.toLocaleString('vi-VN')} <span className="text-xs font-bold text-slate-300">đ</span>
-                </p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center border-b border-dashed border-slate-100 pb-1.5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Doanh thu:</span>
+                <span className="font-mono font-bold text-slate-800 text-sm xs:text-base">
+                  {reportData.totals.drink.revenue.toLocaleString('vi-VN')} <span className="text-[10px] text-slate-400 font-medium">đ</span>
+                </span>
               </div>
-              <div>
-                <p className="text-[10px] text-sky-600 font-bold uppercase tracking-wider">Lợi nhuận</p>
-                <p className="font-mono font-black text-sky-600 text-xl mt-1">
-                  {reportData.totals.drink.profit.toLocaleString('vi-VN')} <span className="text-xs font-bold">đ</span>
-                </p>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-sky-600 font-bold uppercase">Lợi nhuận:</span>
+                <span className="font-mono font-black text-sky-600 text-sm xs:text-base">
+                  {reportData.totals.drink.profit.toLocaleString('vi-VN')} <span className="text-[10px]">đ</span>
+                </span>
               </div>
             </div>
           </div>
@@ -416,16 +418,16 @@ export default function ReportSection({ products, orders, categories, storeConfi
       </div>
 
       {/* DATA TABLE SECTION */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-slate-50/50 p-3 xs:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-200/50 flex items-center justify-center border border-slate-300/30">
-              <RefreshCw className="w-4 h-4 text-slate-500" />
+            <div className="w-7 h-7 rounded-lg bg-slate-200/50 flex items-center justify-center border border-slate-300/30">
+              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
             </div>
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Chi tiết bảng kê sản phẩm</span>
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Chi tiết bảng kê sản phẩm</span>
           </div>
-          <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-            Chạm vào tiêu đề cột để sắp xếp
+          <div className="text-[10px] text-slate-400 font-bold uppercase">
+            Chạm tiêu đề cột để sắp xếp
           </div>
         </div>
 
