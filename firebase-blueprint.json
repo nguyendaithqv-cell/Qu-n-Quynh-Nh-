@@ -72,6 +72,8 @@
       "properties": {
         "id": { "type": "string" },
         "billCode": { "type": "string" },
+        "tableId": { "type": "string" },
+        "tableName": { "type": "string" },
         "customerName": { "type": "string" },
         "customerPhone": { "type": "string" },
         "customerAddress": { "type": "string" },
@@ -89,9 +91,27 @@
         "items": { "type": "array" }
       },
       "required": ["id", "billCode", "customerName", "customerPhone", "customerAddress", "paymentMethod", "subTotal", "discountAmount", "totalAmount", "status", "paymentStatus", "createdAt", "items"]
+    },
+    "Table": {
+      "title": "Table",
+      "description": "Restaurant table",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["available", "occupied", "reserved"] },
+        "qrCode": { "type": "string" },
+        "currentOrderId": { "type": "string" },
+        "capacity": { "type": "number" }
+      },
+      "required": ["id", "name", "status"]
     }
   },
   "firestore": {
+    "/tables/{tableId}": {
+      "schema": "Table",
+      "description": "Restaurant tables management"
+    },
     "/categories/{categoryId}": {
       "schema": "Category",
       "description": "Collection of menu categories"
