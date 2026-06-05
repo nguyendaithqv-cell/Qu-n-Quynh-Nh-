@@ -33,7 +33,8 @@ import {
   Laptop,
   GripVertical,
   QrCode,
-  Layout
+  Layout,
+  Lock
 } from 'lucide-react';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreConfig, Promotion, Customer, Table, Area } from '../types';
 import ReportSection from './ReportSection';
@@ -78,10 +79,69 @@ export default function AdminPanel({
   onBackToPicker
 }: AdminPanelProps) {
   // Navigation
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'tables' | 'promotions' | 'store' | 'customers' | 'report' | 'system'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'tables' | 'promotions' | 'store' | 'customers' | 'report' | 'system' | 'staff'>('orders');
   const [productFilter, setProductFilter] = useState<'all' | 'available' | 'unavailable'>('all');
   const [categoryIdFilter, setCategoryIdFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Staff management state
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [newStaff, setNewStaff] = useState<any>({
+    fullName: '',
+    username: '',
+    password: '',
+    phone: '',
+    birthYear: new Date().getFullYear() - 20,
+    role: 'Nhân viên',
+    avatar: '👤'
+  });
+
+  const openAddStaff = () => {
+    setEditingStaffId(null);
+    setNewStaff({
+      fullName: '',
+      username: '',
+      password: '',
+      phone: '',
+      birthYear: new Date().getFullYear() - 20,
+      role: 'Nhân viên',
+      avatar: '👤'
+    });
+    setIsStaffModalOpen(true);
+  };
+
+  const openEditStaff = (staff: any) => {
+    setEditingStaffId(staff.id);
+    setNewStaff({ ...staff });
+    setIsStaffModalOpen(true);
+  };
+
+  const handleSaveStaff = () => {
+    const staffList = storeConfig.staff || [];
+    const staffToSave = { ...newStaff };
+    
+    // Safety check: Don't save large base64 images to Firestore document if they exceed typical limits.
+    // For now, if avatar is too large (likely Base64), reset to a default if user just wants it to work.
+    if (staffToSave.avatar && staffToSave.avatar.length > 5000) {
+      staffToSave.avatar = '👤'; // Default emoji
+    }
+    
+    if (editingStaffId) {
+        // Edit
+        onUpdateStoreConfig({
+            ...storeConfig,
+            staff: staffList.map(s => s.id === editingStaffId ? { ...staffToSave, id: editingStaffId } : s)
+        });
+    } else {
+        // Add
+        onUpdateStoreConfig({
+            ...storeConfig,
+            staff: [...staffList, { ...staffToSave, id: Date.now().toString() }]
+        });
+    }
+    setIsStaffModalOpen(false);
+  };
 
   // System Theme & Settings States
   const [adminTheme, setAdminTheme] = useState<'standard' | 'vista' | 'cyberpunk' | 'win11'>(
@@ -811,7 +871,17 @@ export default function AdminPanel({
   // Store Configuration Save
   const handleSaveStoreConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateStoreConfig(editingConfig);
+    
+    // Strip large avatars before saving
+    const cleanedConfig = {
+      ...editingConfig,
+      staff: editingConfig.staff?.map(s => ({
+        ...s,
+        avatar: (s.avatar && s.avatar.length > 5000) ? '👤' : s.avatar
+      }))
+    };
+    
+    onUpdateStoreConfig(cleanedConfig);
     alert('Đã cập nhật thông tin cài đặt cửa hàng thành công!');
   };
 
@@ -1160,6 +1230,14 @@ export default function AdminPanel({
           <Database className="w-4 h-4" /> Thông Tin Cửa Hàng
         </button>
         <button
+          onClick={() => setActiveTab('staff')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shrink-0 uppercase tracking-wide font-black ${
+            activeTab === 'staff' ? t.tabActive : t.tabInactive
+          }`}
+        >
+          <Layers className="w-4 h-4" /> Nhân Viên ({storeConfig.staff?.length || 0})
+        </button>
+        <button
           onClick={() => setActiveTab('system')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all shrink-0 uppercase tracking-wide font-black ${
             activeTab === 'system' ? t.tabActive : t.tabInactive
@@ -1170,6 +1248,125 @@ export default function AdminPanel({
       </div>
 
       {/* Dynamic Content Views */}
+
+      {/* 1. STAFF VIEW */}
+      {activeTab === 'staff' && (
+        <div className="space-y-6 animate-fade-in text-xs">
+          <div className={`${t.card} p-5 flex justify-between items-center`}>
+            <h2 className="font-black text-lg uppercase tracking-wider">Quản lý nhân viên</h2>
+            <button 
+              onClick={openAddStaff}
+              className={t.btnAccent}
+            >
+              <Plus className="w-4 h-4" /> Thêm mới
+            </button>
+          </div>
+
+          <div className={`${t.card} p-0 overflow-hidden`}>
+             <table className="w-full text-left">
+                <thead className={t.tableHeader}>
+                   <tr>
+                     <th className={t.tableHeaderCell}>Avatar</th>
+                     <th className={t.tableHeaderCell}>Họ tên</th>
+                     <th className={t.tableHeaderCell}>Tên đăng nhập</th>
+                     <th className={t.tableHeaderCell}>SĐT</th>
+                     <th className={t.tableHeaderCell}>Chức vụ</th>
+                     <th className={t.tableHeaderCell}>Hành động</th>
+                   </tr>
+                </thead>
+                <tbody>
+                  {storeConfig.staff?.map(staff => (
+                    <tr key={staff.id} className={t.tableRow}>
+                      <td className={`p-3 ${t.tableCellBorder}`}>
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                          {staff.avatar ? <img src={staff.avatar} alt={staff.fullName} className="w-full h-full object-cover" /> : staff.avatar || '👤'}
+                        </div>
+                      </td>
+                      <td className={`p-3 ${t.tableCellBorder} font-bold`}>{staff.fullName}</td>
+                      <td className={`p-3 ${t.tableCellBorder} font-mono text-slate-500`}>{staff.username}</td>
+                      <td className={`p-3 ${t.tableCellBorder}`}>{staff.phone}</td>
+                      <td className={`p-3 ${t.tableCellBorder}`}>{staff.role}</td>
+                      <td className={`p-3 flex gap-2`}>
+                        <button onClick={() => openEditStaff(staff)} className="text-orange-500 font-bold hover:underline">Sửa</button>
+                        <button onClick={() => {
+                          onUpdateStoreConfig({
+                            ...storeConfig,
+                            staff: storeConfig.staff?.filter(s => s.id !== staff.id)
+                          });
+                        }} className="text-rose-500 font-bold hover:underline">Xóa</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+             </table>
+          </div>
+          
+          {/* Staff Modal (Add/Edit) */}
+          {isStaffModalOpen && (
+             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+                   <h3 className="font-black text-lg">{editingStaffId ? 'Sửa thông tin' : 'Thêm Nhân viên'}</h3>
+                   
+                   <div className="flex justify-center">
+                     <label className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer overflow-hidden border-2 border-dashed border-slate-300">
+                      {newStaff.avatar ? <img src={newStaff.avatar} alt="Avatar" className="w-full h-full object-cover"/> : <span className="text-2xl">📷</span>}
+                      <input type="file" className="hidden" onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => setNewStaff({...newStaff, avatar: reader.result as string});
+                          reader.readAsDataURL(file);
+                        }
+                      }} />
+                     </label>
+                   </div>
+                   
+                   <input type="text" placeholder="Họ tên" className={t.input} value={newStaff.fullName} onChange={e => setNewStaff({...newStaff, fullName: e.target.value})} />
+                   <input type="text" placeholder="Tên đăng nhập" className={t.input} value={newStaff.username} onChange={e => setNewStaff({...newStaff, username: e.target.value})} />
+                   <input type="password" placeholder="Mật khẩu" className={t.input} value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} />
+                   <input type="text" placeholder="SĐT" className={t.input} value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} />
+                   <input type="number" placeholder="Năm sinh" className={t.input} value={newStaff.birthYear} onChange={e => setNewStaff({...newStaff, birthYear: parseInt(e.target.value)})} />
+                   <select className={t.input} value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})}>
+                      {storeConfig.roles?.map(r => <option key={r} value={r}>{r}</option>) || <>
+                        <option value="Nhân viên">Nhân viên</option>
+                        <option value="Quản lý">Quản lý</option>
+                      </>}
+                   </select>
+
+                   <div className="flex gap-2 justify-end">
+                     <button onClick={() => setIsStaffModalOpen(false)} className={t.btnSec}>Hủy</button>
+                     <button onClick={handleSaveStaff} className={t.btnAccent}>Lưu</button>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {/* Role Management Section */}
+          <div className={`${t.card} p-5 space-y-4`}>
+            <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+              Quản lý chức vụ
+            </h3>
+            <div className="flex gap-2 flex-wrap">
+              {storeConfig.roles?.map(role => (
+                <span key={role} className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-xs font-bold">
+                  {role}
+                  <button onClick={() => onUpdateStoreConfig({...storeConfig, roles: storeConfig.roles?.filter(r => r !== role)})}>×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" id="newRoleInput" placeholder="Chức vụ mới..." className={t.input} />
+              <button className={t.btnAccent} onClick={() => {
+                const roleInput = document.getElementById('newRoleInput') as HTMLInputElement;
+                if (roleInput.value) {
+                  onUpdateStoreConfig({...storeConfig, roles: [...(storeConfig.roles || ['Nhân viên', 'Quản lý']), roleInput.value]});
+                  roleInput.value = '';
+                }
+              }}>Thêm</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. ORDERS VIEW */}
       {activeTab === 'orders' && (
@@ -3925,6 +4122,33 @@ export default function AdminPanel({
       {/* 8. SYSTEM CONFIGURATION */}
       {activeTab === 'system' && (
         <div className="space-y-6 animate-fade-in text-xs">
+          {/* Card Password: Change Admin Password */}
+          <div className={`${t.card} p-5 space-y-4`}>
+            <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+              <Lock className={`w-4 h-4 ${t.icon}`} /> Đổi mật khẩu admin
+            </h3>
+            <div className="flex gap-2">
+              <input 
+                type="password" 
+                placeholder="Nhập mã PIN mới (4 số)"
+                className={t.input}
+                maxLength={4}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setEditingConfig({...editingConfig, adminPin: val});
+                }}
+                value={editingConfig.adminPin || ''}
+              />
+              <button
+                type="button"
+                className={t.btnAccent}
+                onClick={handleSaveStoreConfig}
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+          
           {/* Card A: Giao Diện / Theme Config */}
           <div className={`${t.card} p-5 space-y-4`}>
             <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">

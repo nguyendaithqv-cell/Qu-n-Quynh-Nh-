@@ -81,6 +81,17 @@ export interface Order {
   cancellationReason?: string;
 }
 
+export interface Staff {
+  id: string;
+  fullName: string;
+  username: string;
+  password: string;
+  phone: string;
+  birthYear: number;
+  role: string;
+  avatar: string;
+}
+
 export interface StoreConfig {
   name: string;
   address: string;
@@ -94,6 +105,9 @@ export interface StoreConfig {
   logoUrl?: string;
   theme?: 'standard' | 'vista' | 'cyberpunk' | 'win11';
   useDynamicQrAmount?: boolean;
+  adminPin?: string;
+  staff?: Staff[];
+  roles?: string[];
 }
 
 export interface Promotion {

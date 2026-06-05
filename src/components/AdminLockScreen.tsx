@@ -4,9 +4,10 @@ import { Lock, ShieldAlert, CheckCircle2, Delete } from 'lucide-react';
 interface AdminLockScreenProps {
   onSuccess: () => void;
   onCancel?: () => void;
+  adminPin?: string;
 }
 
-export default function AdminLockScreen({ onSuccess, onCancel }: AdminLockScreenProps) {
+export default function AdminLockScreen({ onSuccess, onCancel, adminPin = '1111' }: AdminLockScreenProps) {
   const [pin, setPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
@@ -28,14 +29,14 @@ export default function AdminLockScreen({ onSuccess, onCancel }: AdminLockScreen
   }, [pin, isSuccess]);
 
   const handleDigit = (digit: string) => {
-    if (pin.length >= 4) return;
+    if (pin.length >= (adminPin.length || 4)) return;
     setErrorMsg('');
     const newPin = pin + digit;
     setPin(newPin);
 
-    if (newPin.length === 4) {
-      // Evaluate instantly once 4 digits are typed
-      if (newPin === '1111') {
+    if (newPin.length === (adminPin.length || 4)) {
+      // Evaluate instantly once digits are typed
+      if (newPin === adminPin) {
         setIsSuccess(true);
         setTimeout(() => {
           onSuccess();

@@ -677,6 +677,7 @@ export default function App() {
                   setAdminViewMode('picker');
                 }}
                 onCancel={() => setMobileMode('client')}
+                adminPin={storeConfig.adminPin}
               />
             </div>
           ) : adminViewMode === 'picker' ? (
@@ -926,6 +927,7 @@ export default function App() {
               setIsAdminAuthenticated(true);
               setAdminViewMode('picker');
             }}
+            adminPin={storeConfig.adminPin}
           />
         ) : (
           <AdminPanel
