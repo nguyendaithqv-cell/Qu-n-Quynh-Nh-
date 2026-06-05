@@ -211,10 +211,15 @@ export default function CashierPOS({
     return mapping;
   }, [orders]);
 
-  // Derived current occupied status
+  // Include a dynamic virtual area for online/delivery tracking
+  const cashierAreas = useMemo(() => {
+    return [...areas, { id: 'virtual_online', name: '📱 Trực Tuyến' }];
+  }, [areas]);
+
+  // Derived current occupied status including virtual tables SHIP and BOOKING
   const tablesWithDetails = useMemo(() => {
-    // Merge provided dynamic tables with POS logic
-    return tables.map(tbl => {
+    // Normal physical tables
+    const list = tables.map(tbl => {
       const activeOrder = activeOrdersByTable[tbl.id];
       return {
         ...tbl,
@@ -222,31 +227,108 @@ export default function CashierPOS({
         activeOrder: activeOrder || null,
       };
     });
-  }, [activeOrdersByTable, tables]);
+
+    // Check if there are active orders for virtual SHIP and BOOKING tables
+    const activeShipOrders = orders.filter(o => o.tableId === 'SHIP' && o.status !== 'completed' && o.status !== 'cancelled');
+    const activeBookingOrders = orders.filter(o => o.tableId === 'BOOKING' && o.status !== 'completed' && o.status !== 'cancelled');
+
+    // Sort newer orders first for placeholder activeOrder assignment
+    const sortedShipOrders = [...activeShipOrders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sortedBookingOrders = [...activeBookingOrders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const virtualTables = [
+      {
+        id: 'SHIP',
+        name: '🚀 ĐƠN SHIP',
+        status: (activeShipOrders.length > 0 ? 'occupied' : 'available') as 'occupied' | 'available' | 'reserved',
+        isOccupied: activeShipOrders.length > 0,
+        activeOrder: sortedShipOrders[0] || null,
+        areaId: 'virtual_online',
+        capacity: 0,
+        sortOrder: 1000,
+      },
+      {
+        id: 'BOOKING',
+        name: '📅 ĐẶT TRƯỚC',
+        status: (activeBookingOrders.length > 0 ? 'occupied' : 'available') as 'occupied' | 'available' | 'reserved',
+        isOccupied: activeBookingOrders.length > 0,
+        activeOrder: sortedBookingOrders[0] || null,
+        areaId: 'virtual_online',
+        capacity: 0,
+        sortOrder: 1001,
+      }
+    ];
+
+    return [...list, ...virtualTables];
+  }, [activeOrdersByTable, tables, orders]);
 
   // Handle setting table selection & syncing cart
   const currentSelectedTableDetail = useMemo(() => {
     return tablesWithDetails.find(t => t.id === selectedTable);
   }, [tablesWithDetails, selectedTable]);
 
+  // States to manage multiple concurrent billing order queues (e.g. SHIP / BOOKING)
+  const [selectedSubOrderId, setSelectedSubOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedSubOrderId(null);
+  }, [selectedTable]);
+
+  // Get all active orders for the currently selected table
+  const activeOrdersForSelectedTable = useMemo(() => {
+    if (!selectedTable) return [];
+    
+    // For SHIP or BOOKING, we want all non-completed, non-cancelled orders for that table
+    if (selectedTable === 'SHIP' || selectedTable === 'BOOKING') {
+      return orders.filter(o => 
+        o.tableId === selectedTable && 
+        o.status !== 'completed' && 
+        o.status !== 'cancelled'
+      ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    
+    // For normal tables, get all active qualifying orders
+    return orders.filter(o => 
+      getTableOfOrder(o) === selectedTable && 
+      o.status !== 'completed' && 
+      o.status !== 'cancelled'
+    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [selectedTable, orders]);
+
+  const currentActiveOrder = useMemo(() => {
+    if (activeOrdersForSelectedTable.length === 0) return null;
+    if (selectedSubOrderId) {
+      const match = activeOrdersForSelectedTable.find(o => o.id === selectedSubOrderId);
+      if (match) return match;
+    }
+    return activeOrdersForSelectedTable[0];
+  }, [activeOrdersForSelectedTable, selectedSubOrderId]);
+
   // Load selected table status to ordering forms
   useEffect(() => {
-    if (currentSelectedTableDetail?.isOccupied && currentSelectedTableDetail.activeOrder) {
-      const ord = currentSelectedTableDetail.activeOrder;
+    if (currentActiveOrder) {
+      const ord = currentActiveOrder;
       setPosCart(ord.items || []);
-      setPosCustomerName(ord.customerName || 'Khách tại bàn');
+      setPosCustomerName(ord.customerName || 'Khách ở bàn');
       setPosCustomerPhone(ord.customerPhone || '');
       setPosNote(ord.note || '');
     } else {
       setPosCart([]);
-      const tblName = tables.find(t => t.id === selectedTable)?.name || 'Khách vãng lai';
+      let tblName = 'Khách vãng lai';
+      if (selectedTable === 'SHIP') {
+        tblName = 'Đơn ship mới';
+      } else if (selectedTable === 'BOOKING') {
+        tblName = 'Đặt bàn trước mới';
+      } else {
+        tblName = tables.find(t => t.id === selectedTable)?.name || 'Khách vãng lai';
+      }
       setPosCustomerName(tblName);
       setPosCustomerPhone('');
       setPosNote('');
     }
     setShowMenuMode(false);
     setHasChanges(false);
-  }, [selectedTable, currentSelectedTableDetail]);
+  }, [selectedTable, currentActiveOrder]);
 
   // Save POS order (Updates existing active or places new table order)
   const handleSavePOSOrder = async () => {
@@ -259,11 +341,18 @@ export default function CashierPOS({
     const discountAmount = 0; // Handled at final billing/payment checkout
     const totalAmount = subTotal - discountAmount;
     
-    const tblName = tables.find(t => t.id === selectedTable)?.name || 'Bàn';
+    let tblName = 'Bàn';
+    if (selectedTable === 'SHIP') {
+      tblName = '🚀 ĐƠN SHIP';
+    } else if (selectedTable === 'BOOKING') {
+      tblName = '📅 ĐẶT TRƯỚC';
+    } else {
+      tblName = tables.find(t => t.id === selectedTable)?.name || 'Bàn';
+    }
 
     // If there is already an active order, update its items. Else, create new.
-    if (currentSelectedTableDetail?.isOccupied && currentSelectedTableDetail.activeOrder) {
-      const activeOrd = currentSelectedTableDetail.activeOrder;
+    if (currentActiveOrder) {
+      const activeOrd = currentActiveOrder;
       const updatedOrder: Order = {
         ...activeOrd,
         items: posCart,
@@ -322,7 +411,7 @@ export default function CashierPOS({
       return;
     }
 
-    const currentOrder = currentSelectedTableDetail?.activeOrder;
+    const currentOrder = currentActiveOrder;
     const targetTblName = tables.find(t => t.id === transferTargetTableId)?.name || '';
 
     if (!currentOrder || !targetTblName) return;
@@ -355,7 +444,7 @@ export default function CashierPOS({
       return;
     }
 
-    const sourceOrder = currentSelectedTableDetail?.activeOrder;
+    const sourceOrder = currentActiveOrder;
     const targetOrder = targetTblDetail.activeOrder;
 
     if (!sourceOrder || !targetOrder) return;
@@ -405,7 +494,7 @@ export default function CashierPOS({
     return promotions.find(p => p.code.toLowerCase() === selectedPromoCode.toLowerCase() && p.isActive);
   }, [selectedPromoCode, promotions]);
 
-  const rawSubTotal = currentSelectedTableDetail?.activeOrder?.subTotal || 0;
+  const rawSubTotal = currentActiveOrder?.subTotal || 0;
 
   const currentComputedDiscount = useMemo(() => {
     let disc = customDiscountAmt || 0;
@@ -432,7 +521,7 @@ export default function CashierPOS({
 
   // Complete Payment Action
   const handleFinalizePayment = () => {
-    const currentOrder = currentSelectedTableDetail?.activeOrder;
+    const currentOrder = currentActiveOrder;
     if (!currentOrder) return;
 
     let updatedCustomerName = currentOrder.customerName;
@@ -749,8 +838,8 @@ export default function CashierPOS({
     // Sort by area position in areas list if areaFilterId is 'all'
     if (areaFilterId === 'all') {
       list = [...list].sort((a, b) => {
-        const indexA = areas.findIndex(ar => ar.id === a.areaId);
-        const indexB = areas.findIndex(ar => ar.id === b.areaId);
+        const indexA = cashierAreas.findIndex(ar => ar.id === a.areaId);
+        const indexB = cashierAreas.findIndex(ar => ar.id === b.areaId);
         
         // Items without area go to the end
         const posA = indexA === -1 ? 9999 : indexA;
@@ -762,10 +851,10 @@ export default function CashierPOS({
     }
 
     return list;
-  }, [tablesWithDetails, tableFilter, areaFilterId, areas]);
+  }, [tablesWithDetails, tableFilter, areaFilterId, cashierAreas]);
 
   // Formatted active table order metrics
-  const activeTblOrderCount = tablesWithDetails.filter(t => t.isOccupied).length;
+  const activeTblOrderCount = tablesWithDetails.filter(t => t.isOccupied && t.id !== 'SHIP' && t.id !== 'BOOKING').length;
 
   return (
     <div className={`flex-1 flex flex-col md:flex-row h-full overflow-hidden text-xs ${cm.wrapperBg}`}>
@@ -776,7 +865,7 @@ export default function CashierPOS({
         {/* Floor Header summary stats */}
         <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
           <div>
-            <span className={`${cm.subHeader} text-[10px] block mb-1`}>Bản Đồ Phục Vụ Tại Chỗ</span>
+            <span className={`${cm.subHeader} text-[10px] block mb-1`}>Bản Đồ Phục Vụ Tại Chỗ & Trực Tuyến</span>
             <h1 className={`text-lg font-black tracking-tight ${cm.textPrimary} flex items-center gap-2`}>
               <Utensils className={`w-5 h-5 ${t.icon}`} /> SƠ ĐỒ BÀN THU NGÂN ({activeTblOrderCount}/{tables.length})
             </h1>
@@ -818,7 +907,7 @@ export default function CashierPOS({
         </div>
  
         {/* Area Tabs Filter */}
-        {areas.length > 0 && (
+        {cashierAreas.length > 0 && (
           <div className="mb-4 flex items-center bg-white/50 p-2 rounded-xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
             <div className="flex items-center gap-2 w-full">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap shrink-0 pl-1">Khu vực:</span>
@@ -831,7 +920,7 @@ export default function CashierPOS({
                 >
                   Tất cả
                 </button>
-                {areas.map(area => (
+                {cashierAreas.map(area => (
                   <button
                     key={area.id}
                     onClick={() => setAreaFilterId(area.id)}
@@ -866,14 +955,16 @@ export default function CashierPOS({
                 {/* Table Title and Status dot */}
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xl">🪑</span>
+                    <span className="text-xl">
+                      {tbl.id === 'SHIP' ? '🚀' : tbl.id === 'BOOKING' ? '📅' : '🪑'}
+                    </span>
                     <div>
                       <h3 className={`font-extrabold text-sm tracking-tight ${tbl.isOccupied ? cm.occupiedTextPrimary : cm.emptyTextPrimary}`}>{tbl.name}</h3>
                       <div className="flex flex-col gap-0.5 mt-0.5">
                         {tbl.areaId && (
                           <p className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 ${tbl.isOccupied ? 'text-orange-500' : 'text-sky-600'}`}>
                             <MapPin className="w-2.5 h-2.5" />
-                            {areas.find(a => a.id === tbl.areaId)?.name}
+                            {cashierAreas.find(a => a.id === tbl.areaId)?.name}
                           </p>
                         )}
                         {tbl.isOccupied && tbl.activeOrder?.createdAt && (
@@ -977,18 +1068,56 @@ export default function CashierPOS({
             )}
           </div>
 
+          {/* Multibill Selector queue for multiple bills / SHIP / BOOKING */}
+          {activeOrdersForSelectedTable.length > 1 && (
+            <div className={`mt-2 flex flex-col gap-1 shrink-0 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border ${cm.borderClass}`}>
+              <span className={`text-[8.5px] font-black uppercase tracking-widest ${cm.textSecondary} mb-1 flex items-center justify-between`}>
+                <span>Danh sách chờ ({activeOrdersForSelectedTable.length}):</span>
+                <span className="text-orange-500 font-bold font-mono">BẤM ĐỂ CHỌN ĐƠN</span>
+              </span>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
+                {activeOrdersForSelectedTable.map((ord, idx) => {
+                  const isSubSelected = currentActiveOrder?.id === ord.id;
+                  return (
+                    <button
+                      key={ord.id}
+                      onClick={() => setSelectedSubOrderId(ord.id)}
+                      className={`px-3 py-1.5 rounded-xl border text-left flex flex-col gap-0.5 transition-all outline-none whitespace-nowrap min-w-[130px] shrink-0 ${
+                        isSubSelected 
+                          ? 'bg-orange-600 text-white border-orange-650 shadow-md scale-[1.01]' 
+                          : `${cm.secCardBg} ${cm.textPrimary} ${cm.borderClass} hover:bg-slate-100 dark:hover:bg-slate-900`
+                      }`}
+                    >
+                      <div className="flex justify-between items-center w-full gap-2">
+                        <span className="font-extrabold text-[10px] truncate max-w-[85px]">
+                          {ord.customerName}
+                        </span>
+                        <span className={`text-[8px] px-1 rounded-md py-0.5 leading-none font-black ${isSubSelected ? 'bg-orange-550 text-white' : 'bg-red-500/10 text-rose-500'}`}>
+                          #{idx + 1}
+                        </span>
+                      </div>
+                      <span className={`text-[8px] font-mono font-bold ${isSubSelected ? 'text-orange-100' : cm.textSecondary}`}>
+                        {ord.billCode} • {(ord.totalAmount || 0).toLocaleString('vi-VN')}đ
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Quick client indicators */}
-          {currentSelectedTableDetail?.isOccupied && currentSelectedTableDetail.activeOrder && (
+          {currentActiveOrder && (
             <div className={`mt-2.5 p-2 rounded-lg border ${cm.secCardBg} bg-opacity-60 ${cm.borderClass} flex flex-col gap-1 text-[10px]`}>
               <div className={`flex justify-between ${cm.textSecondary} font-bold`}>
-                <span>Khách hàng: <strong>{currentSelectedTableDetail.activeOrder.customerName}</strong></span>
-                <span>Mã Bill: <strong className="font-mono text-orange-500">{currentSelectedTableDetail.activeOrder.billCode}</strong></span>
+                <span>Khách hàng: <strong>{currentActiveOrder.customerName}</strong></span>
+                <span>Mã Bill: <strong className="font-mono text-orange-500">{currentActiveOrder.billCode}</strong></span>
               </div>
-              {currentSelectedTableDetail.activeOrder.customerPhone && (
-                <p className="text-[#0078d4]">SĐT: {currentSelectedTableDetail.activeOrder.customerPhone}</p>
+              {currentActiveOrder.customerPhone && (
+                <p className="text-[#0078d4]">SĐT: {currentActiveOrder.customerPhone}</p>
               )}
-              {currentSelectedTableDetail.activeOrder.note && (
-                <p className="text-rose-500 italic font-medium">Yêu cầu: "{currentSelectedTableDetail.activeOrder.note}"</p>
+              {currentActiveOrder.note && (
+                <p className="text-rose-500 italic font-medium">Yêu cầu: "{currentActiveOrder.note}"</p>
               )}
             </div>
           )}
@@ -1296,7 +1425,7 @@ export default function CashierPOS({
             </button>
 
             {/* Direct Pay dialog trigger (only for existing active orders) */}
-            {currentSelectedTableDetail?.isOccupied && currentSelectedTableDetail.activeOrder && (
+            {currentActiveOrder && (
               <button
                 onClick={() => {
                   setPrintBillData(null);
@@ -1316,7 +1445,7 @@ export default function CashierPOS({
           </div>
 
           <div className="mt-3 text-center">
-            {currentSelectedTableDetail?.isOccupied ? (
+            {currentActiveOrder ? (
               <span className="text-[10px] text-orange-600 font-extrabold animate-pulse uppercase tracking-tight">
                 ⚠️ CẦN CLICK LƯU & GỬI BẾP NẾU CÓ THAY ĐỔI MÓN!
               </span>
@@ -1424,7 +1553,7 @@ export default function CashierPOS({
       )}
 
       {/* 3. CHECKOUT & PAYMENT MODAL */}
-      {showPaymentModal && currentSelectedTableDetail?.isOccupied && currentSelectedTableDetail.activeOrder && (
+      {showPaymentModal && currentActiveOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
           <div className={`${cm.cardBg} rounded-2xl max-w-lg w-full p-6 border ${cm.borderClass} shadow-2xl animate-scale-up my-8 text-xs`}>
             
@@ -1433,7 +1562,7 @@ export default function CashierPOS({
               <div>
                 <span className="text-[9px] text-orange-650 font-black uppercase tracking-wider block">Thủ tục kết toán hóa đơn</span>
                 <h3 className={`font-extrabold text-sm ${cm.textPrimary} flex items-center gap-1.5 uppercase`}>
-                  🧾 Thanh toán & In Bill: {currentSelectedTableDetail.name}
+                  🧾 Thanh toán & In Bill: {currentSelectedTableDetail?.name}
                 </h3>
               </div>
               <button onClick={() => setShowPaymentModal(false)} className={`${cm.textMuted} hover:opacity-85`}>
@@ -1448,7 +1577,7 @@ export default function CashierPOS({
               <div>
                 <h4 className={`font-bold uppercase tracking-wider ${cm.textMuted} mb-2 text-[9px]`}>Sản Phẩm Chi Tiết</h4>
                 <div className={`max-h-[160px] overflow-y-auto border ${cm.borderClass} p-2 rounded-xl ${cm.secCardBg} bg-opacity-50 flex flex-col gap-1.5`}>
-                  {currentSelectedTableDetail.activeOrder.items.map((item, idx) => (
+                  {currentActiveOrder.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center text-[10.5px]">
                       <span className={`font-bold truncate max-w-[140px] ${cm.textSecondary}`}>{item.productName}</span>
                       <span className={`font-mono font-extrabold ${cm.textSecondary}`}>
@@ -1553,7 +1682,7 @@ export default function CashierPOS({
                         setIsPayAsDebt(checked);
                         if (checked) {
                           setPayingMethod('cod'); // Treat as unpaid paper cod ledger
-                          const currentOrder = currentSelectedTableDetail?.activeOrder;
+                          const currentOrder = currentActiveOrder;
                           if (currentOrder) {
                             const tName = currentSelectedTableDetail?.name || '';
                             const cName = currentOrder.customerName || '';
@@ -1616,7 +1745,7 @@ export default function CashierPOS({
                     (() => {
                       const isDynamicQr = storeConfig.useDynamicQrAmount !== false;
                       const qrUrl = isDynamicQr
-                        ? `https://img.vietqr.io/image/${getVietQrBankId(storeConfig.bankName)}-${storeConfig.bankAccount.replace(/\s+/g, '')}-compact.png?amount=${finalCheckoutAmount}&addInfo=${currentSelectedTableDetail.activeOrder.billCode}%20thanh%20toan%20${currentSelectedTableDetail.name}&accountName=${encodeURIComponent(storeConfig.bankAccountName || 'Khai Vi Diner')}`
+                        ? `https://img.vietqr.io/image/${getVietQrBankId(storeConfig.bankName)}-${storeConfig.bankAccount.replace(/\s+/g, '')}-compact.png?amount=${finalCheckoutAmount}&addInfo=${currentActiveOrder.billCode}%20thanh%20toan%20${currentSelectedTableDetail?.name}&accountName=${encodeURIComponent(storeConfig.bankAccountName || 'Khai Vi Diner')}`
                         : `https://img.vietqr.io/image/${getVietQrBankId(storeConfig.bankName)}-${storeConfig.bankAccount.replace(/\s+/g, '')}-compact.png?amount=0`;
                       return (
                         <img
@@ -1647,13 +1776,13 @@ export default function CashierPOS({
                   </p>
                   {storeConfig.useDynamicQrAmount !== false ? (
                     <p className="text-[10px] font-mono text-[#0078d4] mt-0.5 font-bold">
-                      Nội dung quét: "{currentSelectedTableDetail.activeOrder.billCode} thanh toan {currentSelectedTableDetail.name}"
+                      Nội dung quét: "{currentActiveOrder.billCode} thanh toan {currentSelectedTableDetail?.name}"
                     </p>
                   ) : (
                     <div className="text-[9.5px] text-emerald-600 mt-1 space-y-0.5 leading-snug">
                       <p className="font-bold">💡 Hướng dẫn khách tự nhập:</p>
                       <p>• Số tiền cần trả: <strong className="text-orange-600 font-mono text-[10.5px]">{finalCheckoutAmount.toLocaleString('vi-VN')} đ</strong></p>
-                      <p>• Nội dung chuyển khoản nên ghi: <strong className="text-blue-800 font-mono">"{currentSelectedTableDetail.activeOrder.billCode} thanh toan {currentSelectedTableDetail.name}"</strong></p>
+                      <p>• Nội dung chuyển khoản nên ghi: <strong className="text-blue-800 font-mono">"{currentActiveOrder.billCode} thanh toan {currentSelectedTableDetail?.name}"</strong></p>
                     </div>
                   )}
                 </div>

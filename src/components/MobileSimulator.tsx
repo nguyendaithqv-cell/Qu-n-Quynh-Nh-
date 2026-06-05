@@ -41,6 +41,7 @@ interface MobileSimulatorProps {
   orders?: Order[];
   tables?: Table[];
   onUpdateTables?: (tables: Table[]) => void;
+  isAdminAuthenticated?: boolean;
 }
 
 export default function MobileSimulator({
@@ -55,7 +56,8 @@ export default function MobileSimulator({
   onViewModeChange,
   orders,
   tables,
-  onUpdateTables
+  onUpdateTables,
+  isAdminAuthenticated = false
 }: MobileSimulatorProps) {
   // Controlled or uncontrolled view mode state
   const [internalViewMode, setInternalViewMode] = useState<'menu' | 'history' | 'contact'>('menu');
@@ -166,6 +168,41 @@ export default function MobileSimulator({
     if (!tId) return true; // No table, no check-in required
     return sessionStorage.getItem(`table_confirmed_${tId}`) === 'true';
   });
+
+  // Direct access selection states (Ship or Booking)
+  const [directSelection, setDirectSelection] = useState<'ship' | 'booking' | null>(() => {
+    const val = sessionStorage.getItem('direct_selection');
+    return (val === 'ship' || val === 'booking') ? val as 'ship' | 'booking' : null;
+  });
+
+  const [isDirectConfirmed, setIsDirectConfirmed] = useState<boolean>(() => {
+    return sessionStorage.getItem('direct_confirmed') === 'true';
+  });
+
+  const [bookingTime, setBookingTime] = useState<string>(() => {
+    return sessionStorage.getItem('booking_time') || '';
+  });
+
+  const [bookingGuests, setBookingGuests] = useState<string>(() => {
+    return sessionStorage.getItem('booking_guests') || '';
+  });
+
+  // Restore direct access table on mount if verified
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tId = params.get('tableId');
+    if (!tId) {
+      const confirmed = sessionStorage.getItem('direct_confirmed') === 'true';
+      const selection = sessionStorage.getItem('direct_selection');
+      if (confirmed && selection) {
+        if (selection === 'ship') {
+          setSelectedTable({ id: 'SHIP', name: 'ĐƠN SHIP' });
+        } else if (selection === 'booking') {
+          setSelectedTable({ id: 'BOOKING', name: 'ĐƠN ĐẶT BÀN' });
+        }
+      }
+    }
+  }, []);
 
   const [checkInName, setCheckInName] = useState<string>('');
   const [checkInPhone, setCheckInPhone] = useState<string>('');
@@ -585,6 +622,11 @@ export default function MobileSimulator({
 
     // Prepare final note with utensil info if selected
     let finalNote = customerNote.trim();
+    if (selectedTable?.id === 'BOOKING') {
+      const bookingInfo = `[Đặt trước: ${bookingTime}]${bookingGuests ? ` [Khách: ${bookingGuests}]` : ''}`;
+      finalNote = finalNote ? `${bookingInfo} | ${finalNote}` : bookingInfo;
+    }
+
     if (wantsUtensils) {
       const utensilInfo = `[Dụng cụ: ${utensilsCount} người]`;
       finalNote = finalNote ? `${finalNote} ${utensilInfo}` : utensilInfo;
@@ -759,8 +801,235 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
   };
 
   // Standard standalone mobile header/footer
+  const showDirectOnboarding = !isAdminAuthenticated && !selectedTable && !isDirectConfirmed;
+
   return (
     <div className={`${c_theme.pageWrapper} ${!isStandaloneMobile ? 'h-[640px] overflow-hidden' : 'h-screen overflow-hidden'}`}>
+      {/* Onboarding Selector Overlay for Direct Customer Visitors */}
+      {showDirectOnboarding && (
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-150 dark:border-slate-800 space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="text-center space-y-1.5">
+              <div className="w-14 h-14 bg-gradient-to-tr from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto text-white select-none">
+                <span className="text-2xl">🍲</span>
+              </div>
+              <p className="text-[9px] uppercase tracking-widest font-extrabold text-orange-600 block pt-1">Chào mừng bạn ghé thăm</p>
+              <h2 className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                {storeConfig.name || 'Quán của chúng tôi'}
+              </h2>
+              <p className="text-slate-400 dark:text-slate-500 text-[10.5px] leading-relaxed">
+                Vui lòng chọn hình thức đặt món phía dưới để nhận món ngon nhanh nhất nhé!
+              </p>
+            </div>
+
+            {/* Direct Selection Menu */}
+            {!directSelection ? (
+              <div className="space-y-3 py-2">
+                <button
+                  onClick={() => setDirectSelection('ship')}
+                  className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 hover:border-orange-500 dark:hover:border-orange-500 bg-slate-50 hover:bg-orange-50/20 dark:bg-slate-950 transition-all flex items-center gap-3.5 text-left active:scale-[0.98]"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-orange-100 dark:bg-orange-950 flex items-center justify-center text-xl shrink-0">
+                    🚀
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[12px] uppercase">Giao Hàng Tận Nơi</h3>
+                    <p className="text-slate-400 dark:text-slate-550 text-[10px] leading-snug">Ship đồ ăn thức uống nóng hổi tận nhà, thanh toán khi nhận hàng.</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setDirectSelection('booking')}
+                  className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 hover:border-orange-500 dark:hover:border-orange-500 bg-slate-50 hover:bg-orange-50/20 dark:bg-slate-950 transition-all flex items-center gap-3.5 text-left active:scale-[0.98]"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-xl shrink-0">
+                    📅
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[12px] uppercase">Đặt Trước Bàn Ăn</h3>
+                    <p className="text-slate-400 dark:text-slate-550 text-[10px] leading-snug">Chọn giờ đến & gọi trước món, đến bàn là có sẵn luôn không đợi.</p>
+                  </div>
+                </button>
+              </div>
+            ) : (
+              /* Information Entry Form based on selection */
+              <div className="space-y-3.5 pt-1">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                    {directSelection === 'ship' ? '🚀 ĐƠN SHIP TẬN NƠI' : '📅 ĐẶT BÀN TRƯỚC'}
+                  </span>
+                  <button 
+                    onClick={() => {
+                      setDirectSelection(null);
+                      setCheckInError('');
+                    }}
+                    className="text-[10px] font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1"
+                  >
+                    ← Chọn lại
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Tên người nhận *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-slate-400">👤</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nhập họ tên của bạn..."
+                        value={checkInName}
+                        onChange={(e) => {
+                          setCheckInName(e.target.value);
+                          if (checkInError) setCheckInError('');
+                        }}
+                        className="w-full rounded-xl py-2 pl-8 pr-3 text-[11px] font-bold border border-slate-250 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Số điện thoại *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-slate-400">📞</span>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Nhập số điện thoại liên hệ..."
+                        value={checkInPhone}
+                        onChange={(e) => {
+                          setCheckInPhone(e.target.value);
+                          if (checkInError) setCheckInError('');
+                        }}
+                        className="w-full rounded-xl py-2 pl-8 pr-3 text-[11px] font-black font-mono border border-slate-250 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {directSelection === 'ship' ? (
+                    <div className="space-y-1 animate-in slide-in-from-top-1">
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Địa chỉ giao hàng *</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-slate-400">📍</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Số nhà, tên đường, phường..."
+                          value={customerAddress}
+                          onChange={(e) => setCustomerAddress(e.target.value)}
+                          className="w-full rounded-xl py-2 pl-8 pr-3 text-[11px] font-medium border border-slate-250 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-1">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Giờ đến nhận *</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-2 text-slate-450 z-10 font-sans">⏰</span>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ví dụ: 19h tối"
+                            value={bookingTime}
+                            onChange={(e) => setBookingTime(e.target.value)}
+                            className="w-full rounded-xl py-2 pl-7 pr-2 text-[10px] font-extrabold border border-slate-250 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Số lượng khách</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-2 text-slate-450 z-10 font-sans">🪑</span>
+                          <input
+                            type="text"
+                            placeholder="Ví dụ: 4 người"
+                            value={bookingGuests}
+                            onChange={(e) => setBookingGuests(e.target.value)}
+                            className="w-full rounded-xl py-2 pl-7 pr-2 text-[10px] font-extrabold border border-slate-250 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {checkInError && (
+                    <p className="text-[9.5px] font-bold text-red-500 text-center animate-pulse">
+                      ⚠️ {checkInError}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (!checkInName.trim()) {
+                      setCheckInError('Vui lòng điền Họ và tên!');
+                      return;
+                    }
+                    if (!checkInPhone.trim()) {
+                      setCheckInError('Vui lòng điền Số điện thoại!');
+                      return;
+                    }
+                    const cleanPhone = checkInPhone.trim().replace(/\s+/g, '');
+                    if (cleanPhone.length < 9 || cleanPhone.length > 11) {
+                      setCheckInError('SĐT không hợp lệ! Vui lòng nhập từ 9-11 số.');
+                      return;
+                    }
+
+                    if (directSelection === 'ship' && !customerAddress.trim()) {
+                      setCheckInError('Vui lòng điền Địa chỉ nhận hàng!');
+                      return;
+                    }
+
+                    if (directSelection === 'booking' && !bookingTime.trim()) {
+                      setCheckInError('Vui lòng điền Thời gian đến!');
+                      return;
+                    }
+
+                    // Save verified details to cookie state
+                    setCustomerName(checkInName.trim());
+                    setCustomerPhone(cleanPhone);
+                    
+                    const addressVal = directSelection === 'ship' 
+                      ? customerAddress.trim() 
+                      : 'ĐẶT BÀN TRƯỚC (Booking)';
+                    setCustomerAddress(addressVal);
+
+                    // Set cookie
+                    setCustomerCookie({
+                      customerName: checkInName.trim(),
+                      customerPhone: cleanPhone,
+                      customerAddress: addressVal,
+                      paymentMethod: paymentMethod
+                    });
+
+                    // Set table target dynamically
+                    if (directSelection === 'ship') {
+                      setSelectedTable({ id: 'SHIP', name: 'ĐƠN SHIP' });
+                    } else {
+                      setSelectedTable({ id: 'BOOKING', name: 'ĐƠN ĐẶT BÀN' });
+                      sessionStorage.setItem('booking_time', bookingTime);
+                      sessionStorage.setItem('booking_guests', bookingGuests);
+                    }
+
+                    // Confirm onboarding
+                    setIsDirectConfirmed(true);
+                    sessionStorage.setItem('direct_selection', directSelection);
+                    sessionStorage.setItem('direct_confirmed', 'true');
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black rounded-xl text-[10px] tracking-wider uppercase shadow-md active:scale-[0.98] transition-all block text-center"
+                >
+                  Bắt đầu đặt món →
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
       {/* Table Checking & Customer Identification Screen Overlay */}
       {selectedTable && !isTableConfirmed && (
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">

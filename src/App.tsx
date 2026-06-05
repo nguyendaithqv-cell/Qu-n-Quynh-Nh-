@@ -667,6 +667,7 @@ export default function App() {
               viewMode={mobileMode === 'history' ? 'history' : mobileMode === 'contact' ? 'contact' : 'menu'}
               onViewModeChange={(mode) => setMobileMode(mode === 'history' ? 'history' : mode === 'contact' ? 'contact' : 'client')}
               orders={orders}
+              isAdminAuthenticated={isAdminAuthenticated}
             />
           ) : !isAdminAuthenticated ? (
             <div className="bg-slate-900 min-h-screen pb-16 flex flex-col justify-center">
@@ -987,6 +988,7 @@ export default function App() {
               onAddOrder={handleAddOrder}
               isStandaloneMobile={false}
               orders={orders}
+              isAdminAuthenticated={isAdminAuthenticated}
             />
           </div>
 
