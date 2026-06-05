@@ -718,8 +718,10 @@ export default function AdminPanel({
       const updatedProducts = [...products];
 
       data.forEach((row) => {
-        const catName = row['Danh mục'] || 'Chưa phân loại';
-        let category = updatedCategories.find(c => c.name === catName);
+        const catName = row['Tên Danh Mục'] || row['Danh mục'] || 'Chưa phân loại';
+        const catId = row['Danh mục ID'];
+        let category = updatedCategories.find(c => c.name === catName || (catId && c.id === catId));
+        
         if (!category) {
           const cleanId = catName
             .toLowerCase()
@@ -729,30 +731,35 @@ export default function AdminPanel({
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)+/g, "");
           category = {
-            id: cleanId || `cat-${Date.now()}-${Math.random()}`,
+            id: catId && !updatedCategories.find(c => c.id === catId) ? catId : (cleanId || `cat-${Date.now()}-${Math.random()}`),
             name: catName,
             icon: '🥡',
-            sortOrder: updatedCategories.length
+            sortOrder: updatedCategories.length,
+            type: 'food'
           };
           updatedCategories.push(category);
         }
 
         const prodName = row['Tên món'];
-        let product = updatedProducts.find(p => p.name === prodName);
+        let product = updatedProducts.find(p => p.name === prodName || p.id === row['ID']);
         if (product) {
           product.price = Number(row['Giá (VND)']);
+          product.cost = Number(row['Giá vốn (VND)']) || 0;
           product.description = row['Mô tả'] || '';
           product.categoryId = category!.id;
-          product.isAvailable = row['Trạng thái'] === 'Sẵn sàng';
+          product.isAvailable = row['Trạng thái'] !== 'Hết món';
+          product.isVisibleToCustomer = row['Hiển thị cho khách'] !== 'Không';
           product.image = row['Emoji'] || '🍜';
         } else {
           updatedProducts.push({
-            id: `prod-${Date.now()}-${Math.random()}`,
+            id: row['ID'] || `prod-${Date.now()}-${Math.random()}`,
             name: prodName,
             price: Number(row['Giá (VND)']),
+            cost: Number(row['Giá vốn (VND)']) || 0,
             description: row['Mô tả'] || '',
             categoryId: category!.id,
-            isAvailable: row['Trạng thái'] === 'Sẵn sàng',
+            isAvailable: row['Trạng thái'] !== 'Hết món',
+            isVisibleToCustomer: row['Hiển thị cho khách'] !== 'Không',
             image: row['Emoji'] || '🍜'
           });
         }
@@ -766,17 +773,21 @@ export default function AdminPanel({
   };
 
   const exportMenuToExcel = () => {
-    const data = products.map(product => ({
-      'ID': product.id,
-      'Tên món': product.name,
-      'Danh mục ID': product.categoryId,
-      'Giá (VND)': product.price,
-      'Giá vốn (VND)': product.cost || 0,
-      'Mô tả': product.description,
-      'Trạng thái': product.isAvailable ? 'Sẵn sàng' : 'Hết món',
-      'Hiển thị cho khách': (product.isVisibleToCustomer ?? true) ? 'Có' : 'Không',
-      'Emoji': product.image
-    }));
+    const data = products.map(product => {
+      const cat = categories.find(c => c.id === product.categoryId);
+      return {
+        'ID': product.id,
+        'Tên món': product.name,
+        'Danh mục ID': product.categoryId,
+        'Tên Danh Mục': cat?.name || 'Không xác định',
+        'Giá (VND)': product.price,
+        'Giá vốn (VND)': product.cost || 0,
+        'Mô tả': product.description,
+        'Trạng thái': product.isAvailable ? 'Sẵn sàng' : 'Hết món',
+        'Hiển thị cho khách': (product.isVisibleToCustomer ?? true) ? 'Có' : 'Không',
+        'Emoji': product.image
+      };
+    });
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'ThucDon');
