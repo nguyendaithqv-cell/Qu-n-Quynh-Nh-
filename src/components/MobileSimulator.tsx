@@ -22,7 +22,8 @@ import {
   Calendar,
   ArrowLeft,
   Clock,
-  MessageCircle
+  MessageCircle,
+  Settings
 } from 'lucide-react';
 import { Product, Category, Order, StoreConfig, Promotion, CartItem, CustomerCookieData, Table } from '../types';
 import { setCustomerCookie, getCustomerCookie } from '../data';
@@ -1053,8 +1054,19 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
       {/* Onboarding Selector Overlay for Direct Customer Visitors */}
       {showDirectOnboarding && (
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-150 dark:border-slate-800 space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-150 dark:border-slate-800 space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto relative">
             
+            {/* Admin Login Button */}
+            {onToggleAdminView && (
+              <button
+                onClick={onToggleAdminView}
+                className="absolute right-4 top-4 p-2 text-slate-300 hover:text-orange-600 dark:text-slate-600 dark:hover:text-orange-500 transition-colors"
+                title="Vào Quản Lý"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Header */}
             <div className="text-center space-y-1.5">
               <div className="w-14 h-14 bg-gradient-to-tr from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto text-white select-none">
