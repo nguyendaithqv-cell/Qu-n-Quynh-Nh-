@@ -41,7 +41,8 @@ import { Product, Category, Order, OrderStatus, PaymentStatus, StoreConfig, Prom
 import ReportSection from './ReportSection';
 import NotificationIcon from './NotificationIcon';
 import ActivityLogs from './ActivityLogs';
-import { logAction, sendNotification } from '../utils';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface AdminPanelProps {
   products: Product[];
@@ -281,6 +282,9 @@ export default function AdminPanel({
   const [promotionToDelete, setPromotionToDelete] = useState<Promotion | null>(null);
   const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
   const [areaFilter, setAreaFilter] = useState<string>('all');
+  const [showLogs, setShowLogs] = useState(false);
+  const [selectedLogDate, setSelectedLogDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   type TimeRange = 'all' | 'today' | 'yesterday' | 'week_this' | 'week_last' | 'month_this' | 'month_last' | 'year_this' | 'year_last';
   
@@ -782,6 +786,36 @@ export default function AdminPanel({
       setPromotionToDelete(null);
     }
   };
+  
+  const handleDownloadLogs = async () => {
+    setIsDownloading(true);
+    try {
+      const start = new Date(selectedLogDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(selectedLogDate);
+      end.setHours(23, 59, 59, 999);
+      
+      const q = query(collection(db, 'activityLogs'), where('timestamp', '>=', start.getTime()), where('timestamp', '<=', end.getTime()), orderBy('timestamp', 'desc'));
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map(doc => doc.data());
+      
+      const content = logs.map(log => `[${new Date(log.timestamp).toLocaleString()}] ${log.staffUsername || 'System'}: ${log.action} - ${log.details || ''}`).join('\n');
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nhatky_${selectedLogDate}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi tải nhật ký.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
 
   // Area Operations
   const handleAddAreaSubmit = (e: React.FormEvent) => {
@@ -4167,7 +4201,35 @@ export default function AdminPanel({
       {/* 8. SYSTEM CONFIGURATION */}
       {activeTab === 'system' && (
         <div className="space-y-6 animate-fade-in text-xs">
-          <ActivityLogs />
+          <div className={`${t.card}`}>
+            <button 
+              onClick={() => setShowLogs(!showLogs)}
+              className="w-full p-4 flex items-center justify-between font-bold text-slate-700"
+            >
+              <span className="flex items-center gap-2"><Clipboard className={`w-4 h-4 ${t.icon}`} /> Nhật ký hệ thống</span>
+              {showLogs ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+            </button>
+            {showLogs && (
+              <div className="p-4 border-t border-slate-100">
+                <div className="flex gap-2">
+                  <input 
+                    type="date"
+                    value={selectedLogDate}
+                    onChange={(e) => setSelectedLogDate(e.target.value)}
+                    className={t.input}
+                  />
+                  <button 
+                    onClick={handleDownloadLogs}
+                    disabled={isDownloading}
+                    className={t.btnSec}
+                  >
+                    {isDownloading ? 'Đang tải...' : 'Tải xuống nhật ký'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Card Password: Change Admin Password */}
           <div className={`${t.card} p-5 space-y-4`}>
             <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
