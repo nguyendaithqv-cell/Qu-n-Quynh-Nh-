@@ -18,6 +18,7 @@ export interface Product {
   image: string; // Emoji character or URL
   description: string;
   isAvailable: boolean;
+  isVisibleToCustomer?: boolean;
 }
 
 export interface Category {

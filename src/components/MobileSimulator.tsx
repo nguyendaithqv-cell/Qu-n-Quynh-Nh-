@@ -419,10 +419,11 @@ export default function MobileSimulator({
   // Filter products by search only
   const filteredProductsBySearch = useMemo(() => {
     return products.filter(product => {
+      const isVisible = product.isVisibleToCustomer ?? true;
       const matchesSearch = !searchQuery.trim() || 
                             product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             product.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      return isVisible && matchesSearch;
     }).sort((a, b) => a.price - b.price);
   }, [products, searchQuery]);
 

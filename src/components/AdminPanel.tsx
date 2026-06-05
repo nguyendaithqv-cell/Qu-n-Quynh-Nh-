@@ -43,6 +43,7 @@ import NotificationIcon from './NotificationIcon';
 import ActivityLogs from './ActivityLogs';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { logAndNotify } from '../utils';
 
 interface AdminPanelProps {
   products: Product[];
@@ -766,11 +767,14 @@ export default function AdminPanel({
 
   const exportMenuToExcel = () => {
     const data = products.map(product => ({
+      'ID': product.id,
       'Tên món': product.name,
-      'Danh mục': categories.find(c => c.id === product.categoryId)?.name || product.categoryId,
+      'Danh mục ID': product.categoryId,
       'Giá (VND)': product.price,
+      'Giá vốn (VND)': product.cost || 0,
       'Mô tả': product.description,
       'Trạng thái': product.isAvailable ? 'Sẵn sàng' : 'Hết món',
+      'Hiển thị cho khách': (product.isVisibleToCustomer ?? true) ? 'Có' : 'Không',
       'Emoji': product.image
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -2283,10 +2287,9 @@ export default function AdminPanel({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá bán (VND)*</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá bán (VND)</label>
                         <input
                           type="text"
-                          required
                           min={0}
                           value={newProduct.price ? newProduct.price.toLocaleString('vi-VN') : ''}
                           onChange={(e) => {
@@ -2297,10 +2300,9 @@ export default function AdminPanel({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá vốn (VND)*</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá vốn (VND)</label>
                         <input
                           type="text"
-                          required
                           min={0}
                           value={newProduct.cost ? newProduct.cost.toLocaleString('vi-VN') : ''}
                           onChange={(e) => {
@@ -2350,6 +2352,15 @@ export default function AdminPanel({
                             onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:bg-white outline-none focus:border-orange-500 transition-all resize-none"
                           />
+                          <label className="flex items-center gap-2 cursor-pointer mt-2">
+                            <input
+                              type="checkbox"
+                              checked={newProduct.isVisibleToCustomer ?? true}
+                              onChange={(e) => setNewProduct({ ...newProduct, isVisibleToCustomer: e.target.checked })}
+                              className="w-4 h-4 rounded border-slate-200 text-orange-600 focus:ring-orange-500"
+                            />
+                            <span className="text-[10px] font-bold text-slate-700 uppercase">Hiển thị cho khách</span>
+                          </label>
                         </div>
                         
                         <div>
@@ -2464,10 +2475,9 @@ export default function AdminPanel({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá bán*</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá bán</label>
                         <input
                           type="text"
-                          required
                           min={0}
                           value={editingProduct.price ? editingProduct.price.toLocaleString('vi-VN') : ''}
                           onChange={(e) => {
@@ -2479,10 +2489,9 @@ export default function AdminPanel({
                       </div>
                       
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá vốn*</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Giá vốn</label>
                         <input
                           type="text"
-                          required
                           min={0}
                           value={editingProduct.cost ? editingProduct.cost.toLocaleString('vi-VN') : ''}
                           onChange={(e) => {
@@ -2530,6 +2539,15 @@ export default function AdminPanel({
                             onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:bg-white outline-none focus:border-orange-500 transition-all resize-none"
                           />
+                          <label className="flex items-center gap-2 cursor-pointer mt-2">
+                            <input
+                              type="checkbox"
+                              checked={editingProduct.isVisibleToCustomer ?? true}
+                              onChange={(e) => setEditingProduct({ ...editingProduct, isVisibleToCustomer: e.target.checked })}
+                              className="w-4 h-4 rounded border-slate-200 text-orange-600 focus:ring-orange-500"
+                            />
+                            <span className="text-[10px] font-bold text-slate-700 uppercase">Hiển thị cho khách</span>
+                          </label>
                         </div>
                         
                         <div>
