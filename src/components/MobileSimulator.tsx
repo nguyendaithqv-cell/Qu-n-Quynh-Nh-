@@ -135,6 +135,8 @@ export default function MobileSimulator({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState<boolean>(false);
+  const [serviceError, setServiceError] = useState<string>('');
   const [itemToRemove, setItemToRemove] = useState<CartItem | null>(null);
   const [promoCode, setPromoCode] = useState<string>('');
   const [appliedPromo, setAppliedPromo] = useState<Promotion | null>(null);
@@ -805,6 +807,249 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
 
   return (
     <div className={`${c_theme.pageWrapper} ${!isStandaloneMobile ? 'h-[640px] overflow-hidden' : 'h-screen overflow-hidden'}`}>
+      {/* Service Mode Selector Modal */}
+      {isServiceModalOpen && (
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-150 dark:border-slate-800 space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto relative text-slate-800 dark:text-slate-100 font-sans">
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => {
+                setIsServiceModalOpen(false);
+                setServiceError('');
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-white p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center space-y-1">
+              <span className="text-2xl">⚡</span>
+              <h2 className="text-base font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                Hình Thức Nhận Món
+              </h2>
+              <p className="text-slate-400 dark:text-slate-500 text-[10.5px]">
+                Chọn lại hoặc cập nhật thông tin phục vụ của bạn
+              </p>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3 py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectSelection('ship');
+                  setSelectedTable({ id: 'SHIP', name: 'ĐƠN SHIP' });
+                  sessionStorage.setItem('direct_selection', 'ship');
+                  setServiceError('');
+                  if (!customerAddress || customerAddress.includes('ĐẶT BÀN')) {
+                    setCustomerAddress('');
+                  }
+                }}
+                className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center gap-3 text-left active:scale-[0.98] cursor-pointer ${
+                  directSelection === 'ship' 
+                    ? 'border-orange-500 bg-orange-50/20 shadow-xs' 
+                    : 'border-slate-100 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-950 flex items-center justify-center text-base shrink-0">
+                  🚀
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[11px] uppercase">Giao Hàng Tận Nơi</h3>
+                    {directSelection === 'ship' && (
+                      <span className="text-[8px] bg-orange-600 text-white font-black px-1.5 py-0.5 rounded-md uppercase">Đang chọn</span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 dark:text-slate-500 text-[9.5px] leading-tight truncate">Giao hàng tận nơi nóng hổi.</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectSelection('booking');
+                  setSelectedTable({ id: 'BOOKING', name: 'ĐƠN ĐẶT BÀN' });
+                  sessionStorage.setItem('direct_selection', 'booking');
+                  setServiceError('');
+                }}
+                className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center gap-3 text-left active:scale-[0.98] cursor-pointer ${
+                  directSelection === 'booking' 
+                    ? 'border-sky-500 bg-sky-50/20 shadow-xs' 
+                    : 'border-slate-100 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-sky-100 dark:bg-sky-950 flex items-center justify-center text-base shrink-0">
+                  📅
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[11px] uppercase">Đặt Trước Bàn Ăn</h3>
+                    {directSelection === 'booking' && (
+                      <span className="text-[8px] bg-sky-600 text-white font-black px-1.5 py-0.5 rounded-md uppercase">Đang chọn</span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 dark:text-slate-500 text-[9.5px] leading-tight truncate">Đến là có món ăn ngay.</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Custom fields form, same as check-in */}
+            <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60 font-sans">
+              
+              <div className="space-y-1">
+                <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">Tên của bạn *</label>
+                <input
+                  type="text"
+                  placeholder="Nhập họ tên..."
+                  value={checkInName}
+                  onChange={(e) => {
+                    setCheckInName(e.target.value);
+                    setServiceError('');
+                  }}
+                  className="w-full rounded-xl py-1.5 px-3 text-[11px] font-bold border border-slate-200 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">Số điện thoại *</label>
+                <input
+                  type="tel"
+                  placeholder="Nhập số điện thoại..."
+                  value={checkInPhone}
+                  onChange={(e) => {
+                    setCheckInPhone(e.target.value);
+                    setServiceError('');
+                  }}
+                  className="w-full rounded-xl py-1.5 px-3 text-[11px] font-bold border border-slate-200 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                />
+              </div>
+
+              {directSelection === 'ship' ? (
+                <div className="space-y-1">
+                  <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">Địa chỉ giao hàng *</label>
+                  <input
+                    type="text"
+                    placeholder="Nhập địa chỉ nhận hàng..."
+                    value={customerAddress === 'ĐẶT BÀN TRƯỚC (Booking)' ? '' : customerAddress}
+                    onChange={(e) => {
+                      setCustomerAddress(e.target.value);
+                      setServiceError('');
+                    }}
+                    className="w-full rounded-xl py-1.5 px-3 text-[11px] font-bold border border-slate-200 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 font-sans">
+                  <div className="space-y-1">
+                    <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">Giờ đến *</label>
+                    <input
+                      type="time"
+                      value={bookingTime}
+                      onChange={(e) => {
+                        setBookingTime(e.target.value);
+                        setServiceError('');
+                        sessionStorage.setItem('booking_time', e.target.value);
+                      }}
+                      className="w-full rounded-xl py-1.5 px-2 text-[11px] font-bold border border-slate-200 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                    />
+                  </div>
+                  <div className="space-y-1 font-sans">
+                    <label className="block text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">Số khách *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Số khách..."
+                      value={bookingGuests}
+                      onChange={(e) => {
+                        setBookingGuests(e.target.value);
+                        setServiceError('');
+                        sessionStorage.setItem('booking_guests', e.target.value);
+                      }}
+                      className="w-full rounded-xl py-1.5 px-2 text-[11px] font-bold border border-slate-200 dark:border-slate-700 outline-none focus:border-orange-500 dark:bg-slate-950 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {serviceError && (
+              <div className="text-[10px] bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-2 rounded-xl border border-rose-100 dark:border-rose-900/40 text-center font-bold">
+                ⚠️ {serviceError}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectSelection(null);
+                  setIsDirectConfirmed(false);
+                  setSelectedTable(null);
+                  sessionStorage.removeItem('direct_confirmed');
+                  sessionStorage.removeItem('direct_selection');
+                  sessionStorage.removeItem('booking_time');
+                  sessionStorage.removeItem('booking_guests');
+                  setIsServiceModalOpen(false);
+                  setServiceError('');
+                }}
+                className="flex-1 py-2 text-center rounded-xl text-[10px] font-extrabold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-350 active:scale-[0.97] transition-all cursor-pointer"
+              >
+                Reset Toàn Bộ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!checkInName.trim()) {
+                    setServiceError('Vui lòng nhập Họ tên!');
+                    return;
+                  }
+                  if (!checkInPhone.trim()) {
+                    setServiceError('Vui lòng nhập Số điện thoại!');
+                    return;
+                  }
+                  if (directSelection === 'ship' && !customerAddress.trim()) {
+                    setServiceError('Vui lòng nhập Địa chỉ giao hàng!');
+                    return;
+                  }
+                  
+                  const cleanName = checkInName.trim();
+                  const cleanPhone = checkInPhone.replace(/\D/g, '');
+
+                  setCustomerName(cleanName);
+                  setCustomerPhone(cleanPhone);
+                  
+                  let finalizedAddress = '';
+                  if (directSelection === 'ship') {
+                    finalizedAddress = customerAddress.trim();
+                  } else {
+                    finalizedAddress = 'ĐẶT BÀN TRƯỚC (Booking)';
+                  }
+                  setCustomerAddress(finalizedAddress);
+                  
+                  setCustomerCookie({
+                    customerName: cleanName,
+                    customerPhone: cleanPhone,
+                    customerAddress: finalizedAddress,
+                    paymentMethod: paymentMethod
+                  });
+
+                  sessionStorage.setItem('direct_confirmed', 'true');
+                  setIsServiceModalOpen(false);
+                  setServiceError('');
+                }}
+                className="flex-1 py-2 text-center rounded-xl text-[10px] font-extrabold bg-orange-600 hover:bg-orange-700 text-white shadow-xs active:scale-[0.97] transition-all cursor-pointer"
+              >
+                Cập Nhật
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Onboarding Selector Overlay for Direct Customer Visitors */}
       {showDirectOnboarding && (
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -1210,6 +1455,19 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                 <div className={`${(c_theme as any).tableBadge} flex items-center gap-1 shadow-xs border hidden xs:flex py-0.5`}>
                   <span className="text-[10px]">🪑</span> {selectedTable.name}
                 </div>
+              )}
+              {isDirectConfirmed && (
+                <button 
+                  onClick={() => setIsServiceModalOpen(true)}
+                  className={`p-1.5 rounded-xl transition-all shadow-xs border border-transparent hover:border-orange-200 ${c_theme.btnSec} flex items-center justify-center`}
+                  title="Thay đổi hình thức nhận món (Giao hàng / Đặt trước)"
+                >
+                  {directSelection === 'ship' ? (
+                    <span className="text-sm">🚀</span>
+                  ) : (
+                    <span className="text-sm">📅</span>
+                  )}
+                </button>
               )}
               {onToggleAdminView && (
                 <button 

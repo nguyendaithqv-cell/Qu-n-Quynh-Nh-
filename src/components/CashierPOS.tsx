@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { 
   Utensils, 
+  ChevronLeft,
   ChevronRight, 
   Plus, 
   Minus, 
@@ -211,6 +212,15 @@ export default function CashierPOS({
     return mapping;
   }, [orders]);
 
+  // Count active virtual orders (SHIP and BOOKING)
+  const shipOrdersCount = useMemo(() => {
+    return orders.filter(o => o.tableId === 'SHIP' && o.status !== 'completed' && o.status !== 'cancelled').length;
+  }, [orders]);
+
+  const bookingOrdersCount = useMemo(() => {
+    return orders.filter(o => o.tableId === 'BOOKING' && o.status !== 'completed' && o.status !== 'cancelled').length;
+  }, [orders]);
+
   // Include a dynamic virtual area for online/delivery tracking
   const cashierAreas = useMemo(() => {
     return [...areas, { id: 'virtual_online', name: '📱 Trực Tuyến' }];
@@ -269,6 +279,14 @@ export default function CashierPOS({
 
   // States to manage multiple concurrent billing order queues (e.g. SHIP / BOOKING)
   const [selectedSubOrderId, setSelectedSubOrderId] = useState<string | null>(null);
+  const queueScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollQueue = (direction: 'left' | 'right') => {
+    if (queueScrollRef.current) {
+      const scrollAmt = direction === 'left' ? -180 : 180;
+      queueScrollRef.current.scrollBy({ left: scrollAmt, behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     setSelectedSubOrderId(null);
@@ -920,17 +938,28 @@ export default function CashierPOS({
                 >
                   Tất cả
                 </button>
-                {cashierAreas.map(area => (
-                  <button
-                    key={area.id}
-                    onClick={() => setAreaFilterId(area.id)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap flex-none ${
-                      areaFilterId === area.id ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {area.name}
-                  </button>
-                ))}
+                {cashierAreas.map(area => {
+                  const isOnlineTab = area.id === 'virtual_online';
+                  const totalOnlineCount = shipOrdersCount + bookingOrdersCount;
+                  return (
+                    <button
+                      key={area.id}
+                      onClick={() => setAreaFilterId(area.id)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap flex items-center gap-1.5 flex-none ${
+                        areaFilterId === area.id ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{area.name}</span>
+                      {isOnlineTab && totalOnlineCount > 0 && (
+                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black tracking-normal leading-none ${
+                          areaFilterId === area.id ? 'bg-white text-orange-600' : 'bg-rose-500 text-white animate-pulse'
+                        }`}>
+                          {totalOnlineCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -940,6 +969,12 @@ export default function CashierPOS({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
           {filteredGridTables.map(tbl => {
             const isSelected = tbl.id === selectedTable;
+            const isShip = tbl.id === 'SHIP';
+            const isBooking = tbl.id === 'BOOKING';
+            const isVirtual = isShip || isBooking;
+
+            // Use the cohesive theme-defined card style
+            const cardStyle = tbl.isOccupied ? cm.activeCard : cm.emptyCard;
             
             return (
               <div
@@ -948,27 +983,43 @@ export default function CashierPOS({
                   setSelectedTable(tbl.id);
                   if (isMobileViewport) setShowMobileDetail(true);
                 }}
-                className={`relative p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between select-none h-[142px] ${
-                  tbl.isOccupied ? cm.activeCard : cm.emptyCard
-                } ${isSelected ? 'ring-2 ring-orange-500 scale-[1.02] shadow-md' : ''}`}
+                className={`relative p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between select-none h-[142px] ${cardStyle} ${
+                  isSelected ? 'ring-2 ring-orange-500 scale-[1.02] shadow-md z-10' : ''
+                }`}
               >
                 {/* Table Title and Status dot */}
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xl">
-                      {tbl.id === 'SHIP' ? '🚀' : tbl.id === 'BOOKING' ? '📅' : '🪑'}
+                <div className="flex justify-between items-start gap-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-base w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                      isShip 
+                        ? 'bg-amber-100 dark:bg-amber-955 text-amber-600' 
+                        : isBooking 
+                          ? 'bg-sky-100 dark:bg-sky-955 text-sky-600' 
+                          : 'bg-orange-100/70 dark:bg-orange-955/40 text-orange-600'
+                    }`}>
+                      {isShip ? '🚀' : isBooking ? '📅' : '🪑'}
                     </span>
-                    <div>
-                      <h3 className={`font-extrabold text-sm tracking-tight ${tbl.isOccupied ? cm.occupiedTextPrimary : cm.emptyTextPrimary}`}>{tbl.name}</h3>
+                    <div className="min-w-0 font-bold">
+                      <h3 className={`font-black text-[12px] uppercase tracking-tight leading-tight truncate ${
+                        tbl.isOccupied ? cm.occupiedTextPrimary : cm.emptyTextPrimary
+                      }`}>
+                        {isShip ? 'Giao Hàng' : isBooking ? 'Đặt Trước' : tbl.name}
+                      </h3>
                       <div className="flex flex-col gap-0.5 mt-0.5">
                         {tbl.areaId && (
-                          <p className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 ${tbl.isOccupied ? 'text-orange-500' : 'text-sky-600'}`}>
-                            <MapPin className="w-2.5 h-2.5" />
-                            {cashierAreas.find(a => a.id === tbl.areaId)?.name}
+                          <p className={`text-[8.5px] font-black uppercase tracking-tighter flex items-center gap-0.5 ${
+                            tbl.isOccupied ? 'text-orange-500' : 'text-sky-600'
+                          } truncate`}>
+                            {!isVirtual && <MapPin className="w-2.5 h-2.5 shrink-0" />}
+                            <span className="truncate">
+                              {isVirtual ? 'Trực tuyến' : cashierAreas.find(a => a.id === tbl.areaId)?.name}
+                            </span>
                           </p>
                         )}
                         {tbl.isOccupied && tbl.activeOrder?.createdAt && (
-                          <p className={`text-[9px] font-bold flex items-center gap-1 font-mono ${tbl.isOccupied ? cm.occupiedTextMuted : cm.emptyTextMuted}`}>
+                          <p className={`text-[9px] font-bold flex items-center gap-1 font-mono ${
+                            tbl.isOccupied ? cm.occupiedTextMuted : cm.emptyTextMuted
+                          }`}>
                             <Clock className="w-3 h-3 text-orange-400 shrink-0" />
                             {new Date(tbl.activeOrder.createdAt).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
                           </p>
@@ -977,32 +1028,47 @@ export default function CashierPOS({
                     </div>
                   </div>
  
-                  {tbl.isOccupied ? (
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-rose-500/10 text-rose-600 font-extrabold uppercase animate-pulse">
+                  {isVirtual ? (
+                    (() => {
+                      const count = isShip ? shipOrdersCount : bookingOrdersCount;
+                      return count > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[8.5px] bg-red-500 text-white font-black uppercase shadow-sm flex items-center gap-1 whitespace-nowrap shrink-0 animate-pulse">
+                          {count} ĐƠN
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-400 font-extrabold uppercase whitespace-nowrap shrink-0">
+                          Trống
+                        </span>
+                      );
+                    })()
+                  ) : tbl.isOccupied ? (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-rose-500/10 text-rose-600 font-extrabold uppercase animate-pulse whitespace-nowrap shrink-0">
                       Bận
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/10 text-emerald-500 font-extrabold uppercase">
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/10 text-emerald-500 font-extrabold uppercase whitespace-nowrap shrink-0">
                       Trống
                     </span>
                   )}
                 </div>
  
                 {/* Main description bottom or active receipt */}
-                <div className="mt-3">
+                <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/40">
                   {tbl.isOccupied && tbl.activeOrder ? (
-                    <div>
-                      <div className={`font-bold font-mono line-clamp-1 mb-1 text-[10px] ${tbl.isOccupied ? cm.occupiedTextMuted : cm.emptyTextMuted}`}>
+                    <div className="space-y-0.5">
+                      <div className={`font-extrabold font-sans line-clamp-1 text-[10px] tracking-tight ${
+                        tbl.isOccupied ? cm.occupiedTextMuted : cm.emptyTextMuted
+                      }`}>
                         👤 {tbl.activeOrder.customerName}
                       </div>
-                      <div className="font-black text-rose-600 font-mono text-[13px] tracking-tight flex items-baseline justify-between border-t border-rose-100/50 pt-2">
-                        <span className="text-[10px] uppercase font-bold text-rose-550">Tổng:</span>
+                      <div className="font-extrabold font-mono text-[11.5px] tracking-tight flex items-baseline justify-between text-rose-600 dark:text-rose-400">
+                        <span className="text-[9.5px] uppercase font-bold opacity-75">Tổng:</span>
                         <span>{tbl.activeOrder.totalAmount.toLocaleString('vi-VN')}đ</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold border-t border-slate-100/60 pt-2">
-                      <span className="uppercase tracking-wider text-[8px]">Sức chứa:</span>
+                    <div className="flex justify-between items-center text-[9.5px] text-slate-400 font-bold">
+                      <span className="uppercase tracking-wider text-[8px] opacity-75">Sức chứa:</span>
                       <span>{tbl.capacity || 4} chỗ</span>
                     </div>
                   )}
@@ -1071,11 +1137,32 @@ export default function CashierPOS({
           {/* Multibill Selector queue for multiple bills / SHIP / BOOKING */}
           {activeOrdersForSelectedTable.length > 1 && (
             <div className={`mt-2 flex flex-col gap-1 shrink-0 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border ${cm.borderClass}`}>
-              <span className={`text-[8.5px] font-black uppercase tracking-widest ${cm.textSecondary} mb-1 flex items-center justify-between`}>
-                <span>Danh sách chờ ({activeOrdersForSelectedTable.length}):</span>
-                <span className="text-orange-500 font-bold font-mono">BẤM ĐỂ CHỌN ĐƠN</span>
-              </span>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
+              <div className={`flex justify-between items-center mb-1 pb-1 border-b border-dashed ${cm.borderClass}`}>
+                <span className={`text-[8.5px] font-black uppercase tracking-widest ${cm.textSecondary}`}>
+                  Danh sách chờ ({activeOrdersForSelectedTable.length}):
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => scrollQueue('left')}
+                    className="p-1 rounded bg-slate-200/80 dark:bg-slate-850 hover:bg-slate-300 dark:hover:bg-slate-800 transition active:scale-90"
+                    title="Cuộn qua trái"
+                  >
+                    <ChevronLeft className="w-3 h-3 text-slate-600 dark:text-slate-300" />
+                  </button>
+                  <button 
+                    onClick={() => scrollQueue('right')}
+                    className="p-1 rounded bg-slate-200/80 dark:bg-slate-850 hover:bg-slate-300 dark:hover:bg-slate-800 transition active:scale-90"
+                    title="Cuộn qua phải"
+                  >
+                    <ChevronRight className="w-3 h-3 text-slate-600 dark:text-slate-300" />
+                  </button>
+                  <span className="text-orange-500 font-black font-mono text-[8px] tracking-wide ml-1.5">BẤM CHỌN ĐƠN</span>
+                </div>
+              </div>
+              <div 
+                ref={queueScrollRef}
+                className="flex gap-2 overflow-x-auto scroll-smooth pb-2 pt-1 px-0.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-slate-900/40"
+              >
                 {activeOrdersForSelectedTable.map((ord, idx) => {
                   const isSubSelected = currentActiveOrder?.id === ord.id;
                   return (
