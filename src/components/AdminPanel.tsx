@@ -34,10 +34,14 @@ import {
   GripVertical,
   QrCode,
   Layout,
-  Lock
+  Lock,
+  Bell
 } from 'lucide-react';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreConfig, Promotion, Customer, Table, Area } from '../types';
 import ReportSection from './ReportSection';
+import NotificationIcon from './NotificationIcon';
+import ActivityLogs from './ActivityLogs';
+import { logAction, sendNotification } from '../utils';
 
 interface AdminPanelProps {
   products: Product[];
@@ -117,7 +121,7 @@ export default function AdminPanel({
     setIsStaffModalOpen(true);
   };
 
-  const handleSaveStaff = () => {
+  const handleSaveStaff = async () => {
     const staffList = storeConfig.staff || [];
     const staffToSave = { ...newStaff };
     
@@ -133,12 +137,14 @@ export default function AdminPanel({
             ...storeConfig,
             staff: staffList.map(s => s.id === editingStaffId ? { ...staffToSave, id: editingStaffId } : s)
         });
+        await logAction('Admin', 'Cập nhật nhân viên', `Nhân viên: ${staffToSave.fullName}`);
     } else {
         // Add
         onUpdateStoreConfig({
             ...storeConfig,
             staff: [...staffList, { ...staffToSave, id: Date.now().toString() }]
         });
+        await logAction('Admin', 'Thêm nhân viên mới', `Tên: ${staffToSave.fullName}`);
     }
     setIsStaffModalOpen(false);
   };
@@ -168,12 +174,13 @@ export default function AdminPanel({
     }
   }, [storeConfig.theme]);
 
-  const handleThemeChange = (newTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11') => {
+  const handleThemeChange = async (newTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11') => {
     setAdminTheme(newTheme);
     onUpdateStoreConfig({
       ...storeConfig,
       theme: newTheme
     });
+    await logAction('Admin', 'Đổi giao diện', `Giao diện mới: ${newTheme}`);
   };
 
   useEffect(() => {
@@ -396,7 +403,7 @@ export default function AdminPanel({
   }, [orders]);
 
   // Order Operations
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (newStatus === 'cancelled') {
         const order = orders.find(o => o.id === orderId);
         if (order) {
@@ -412,6 +419,8 @@ export default function AdminPanel({
       return ord;
     });
     onUpdateOrders(updated);
+    const order = orders.find(o => o.id === orderId);
+    await logAndNotify('Admin', 'Thay đổi trạng thái đơn', `Đơn ${order?.billCode} sang ${newStatus}`, ['admin', 'cashier']);
   };
 
   const handleConfirmCancelOrder = () => {
@@ -432,10 +441,11 @@ export default function AdminPanel({
     setOrderToDelete(order);
   };
 
-  const handleConfirmDeleteOrder = () => {
+  const handleConfirmDeleteOrder = async () => {
     if (orderToDelete) {
       const updated = orders.filter(o => o.id !== orderToDelete.id);
       onUpdateOrders(updated);
+      await logAndNotify('Admin', 'Xoá đơn', `Đơn ${orderToDelete.billCode}`, ['admin', 'cashier']);
       setOrderToDelete(null);
     }
   };
@@ -496,7 +506,7 @@ export default function AdminPanel({
     });
   };
 
-  const handleSaveOrderEditSubmit = (e: React.FormEvent) => {
+  const handleSaveOrderEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingOrder) return;
     if (editingOrder.items.length === 0) {
@@ -505,11 +515,12 @@ export default function AdminPanel({
     }
     const updated = orders.map(o => o.id === editingOrder.id ? editingOrder : o);
     onUpdateOrders(updated);
+    await logAndNotify('Admin', 'Sửa đơn', `Đơn ${editingOrder.billCode}`, ['admin', 'cashier']);
     setEditingOrder(null);
   };
 
   // Product Operations
-  const handleAddProductSubmit = (e: React.FormEvent) => {
+  const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.name.trim()) return;
 
@@ -519,6 +530,7 @@ export default function AdminPanel({
     };
 
     onUpdateProducts([...products, prodToAdd]);
+    await logAndNotify('Admin', 'Thêm món', `Món: ${prodToAdd.name}`, ['admin', 'cashier']);
     setIsAddingProduct(false);
     setNewProduct({
       name: '',
@@ -530,12 +542,13 @@ export default function AdminPanel({
     });
   };
 
-  const handleEditProductSubmit = (e: React.FormEvent) => {
+  const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.name.trim()) return;
 
     const updated = products.map(p => p.id === editingProduct.id ? editingProduct : p);
     onUpdateProducts(updated);
+    await logAndNotify('Admin', 'Sửa món', `Món: ${editingProduct.name}`, ['admin', 'cashier']);
     setEditingProduct(null);
   };
 
@@ -544,10 +557,11 @@ export default function AdminPanel({
     if (prod) setProductToDelete(prod);
   };
 
-  const handleConfirmDeleteProduct = () => {
+  const handleConfirmDeleteProduct = async () => {
     if (productToDelete) {
       const updated = products.filter(p => p.id !== productToDelete.id);
       onUpdateProducts(updated);
+      await logAndNotify('Admin', 'Xoá món', `Món: ${productToDelete.name}`, ['admin', 'cashier']);
       setProductToDelete(null);
     }
   };
@@ -563,7 +577,7 @@ export default function AdminPanel({
   };
 
   // Category Operations
-  const handleAddCategorySubmit = (e: React.FormEvent) => {
+  const handleAddCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategory.name.trim()) return;
 
@@ -589,16 +603,18 @@ export default function AdminPanel({
     };
 
     onUpdateCategories([...categories, catToAdd]);
+    await logAndNotify('Admin', 'Thêm danh mục', `Danh mục: ${catToAdd.name}`, ['admin', 'cashier']);
     setIsAddingCategory(false);
     setNewCategory({ name: '', icon: '🥡', type: 'food' });
   };
 
-  const handleEditCategorySubmit = (e: React.FormEvent) => {
+  const handleEditCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory || !editingCategory.name.trim()) return;
 
     const updated = categories.map(c => c.id === editingCategory.id ? editingCategory : c);
     onUpdateCategories(updated);
+    await logAndNotify('Admin', 'Sửa danh mục', `Danh mục: ${editingCategory.name}`, ['admin', 'cashier']);
     setEditingCategory(null);
   };
 
@@ -630,16 +646,17 @@ export default function AdminPanel({
     if (cat) setCategoryToDelete(cat);
   };
 
-  const handleConfirmDeleteCategory = () => {
+  const handleConfirmDeleteCategory = async () => {
     if (categoryToDelete) {
       const updated = categories.filter(c => c.id !== categoryToDelete.id);
       onUpdateCategories(updated);
+      await logAndNotify('Admin', 'Xoá danh mục', `Danh mục: ${categoryToDelete.name}`, ['admin', 'cashier']);
       setCategoryToDelete(null);
     }
   };
 
   // Promotion Operations
-  const handleAddPromotionSubmit = (e: React.FormEvent) => {
+  const handleAddPromotionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPromo.code.trim()) return;
 
@@ -650,6 +667,7 @@ export default function AdminPanel({
     };
 
     onUpdatePromotions([...promotions, promoToAdd]);
+    await logAndNotify('Admin', 'Thêm khuyến mãi', `Mã: ${promoToAdd.code}`, ['admin', 'cashier']);
     setIsAddingPromotion(false);
     setNewPromo({
       code: '',
@@ -869,7 +887,7 @@ export default function AdminPanel({
   };
 
   // Store Configuration Save
-  const handleSaveStoreConfig = (e: React.FormEvent) => {
+  const handleSaveStoreConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Strip large avatars before saving
@@ -882,6 +900,7 @@ export default function AdminPanel({
     };
     
     onUpdateStoreConfig(cleanedConfig);
+    await logAction('Admin', 'Cấu hình cửa hàng', 'Cập nhật thông tin cửa hàng');
     alert('Đã cập nhật thông tin cài đặt cửa hàng thành công!');
   };
 
@@ -1056,6 +1075,7 @@ export default function AdminPanel({
         
         {/* Dynamic Sync state display & Admin Logout Lock option */}
         <div className="flex items-center gap-2 flex-wrap">
+          <NotificationIcon role="admin" />
           <div className="hidden sm:flex items-center gap-2 text-[10px] uppercase font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-3.5 py-1" title="Đồng bộ thời gian thực với cơ sở dữ liệu Google Cloud Firestore">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             Đồng bộ: Google Firebase Cloud
@@ -4147,6 +4167,7 @@ export default function AdminPanel({
       {/* 8. SYSTEM CONFIGURATION */}
       {activeTab === 'system' && (
         <div className="space-y-6 animate-fade-in text-xs">
+          <ActivityLogs />
           {/* Card Password: Change Admin Password */}
           <div className={`${t.card} p-5 space-y-4`}>
             <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">

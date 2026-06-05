@@ -27,11 +27,13 @@ import {
   Undo,
   Image as FileImage,
   Download,
-  MapPin
+  MapPin,
+  Bell
 } from 'lucide-react';
 import { Product, Category, Order, OrderItem, OrderStatus, PaymentStatus, StoreConfig, Promotion, Table, Area } from '../types';
 import ReportSection from './ReportSection';
-import { getVietQrBankId } from '../utils';
+import { getVietQrBankId, logAndNotify } from '../utils';
+import NotificationIcon from './NotificationIcon';
 
 interface CashierPOSProps {
   products: Product[];
@@ -408,6 +410,7 @@ export default function CashierPOS({
       };
 
       await onAddOrder(newOrd);
+      await logAndNotify('Cashier', 'Tạo đơn hàng mới', `Đơn: ${newOrd.billCode}, Bàn: ${tblName}`, ['admin', 'cashier']);
     }
 
     setHasChanges(false);
@@ -417,7 +420,7 @@ export default function CashierPOS({
   };
 
   // Switch or Transfer current table's order to another empty table
-  const handleTransferTable = () => {
+  const handleTransferTable = async () => {
     if (!transferTargetTableId) {
       alert('Vui lòng chọn bàn đích!');
       return;
@@ -445,12 +448,13 @@ export default function CashierPOS({
     };
 
     onUpdateOrders(orders.map(o => o.id === currentOrder.id ? updatedOrder : o));
+    await logAndNotify('Cashier', 'Chuyển bàn', `Từ ${currentSelectedTableDetail?.name} sang ${targetTblName}`, ['admin', 'cashier']);
     setSelectedTable(transferTargetTableId);
     setShowTransferModal(false);
   };
 
   // Merge table items from current table into another occupied table
-  const handleMergeTable = () => {
+  const handleMergeTable = async () => {
     if (!mergeTargetTableId) {
       alert('Vui lòng chọn bàn cần gộp!');
       return;
@@ -501,6 +505,7 @@ export default function CashierPOS({
       return o;
     }));
 
+    await logAndNotify('Cashier', 'Gộp bàn', `${currentSelectedTableDetail?.name} vào ${targetTblDetail.name}`, ['admin', 'cashier']);
     setSelectedTable(mergeTargetTableId);
     setShowMergeModal(false);
     alert(`Đã gộp thành công ${currentSelectedTableDetail?.name} vào ${targetTblDetail.name}!`);
@@ -538,7 +543,7 @@ export default function CashierPOS({
   }, [customerPaidCash, finalCheckoutAmount]);
 
   // Complete Payment Action
-  const handleFinalizePayment = () => {
+  const handleFinalizePayment = async () => {
     const currentOrder = currentActiveOrder;
     if (!currentOrder) return;
 
@@ -602,6 +607,7 @@ export default function CashierPOS({
     };
 
     onUpdateOrders(orders.map(o => o.id === currentOrder.id ? completedOrder : o));
+    await logAndNotify('Cashier', 'Thanh toán', `Đơn ${completedOrder.billCode} - ${isPayAsDebt ? 'Ghi nợ' : 'Đã trả'}`, ['admin', 'cashier']);
     
     // Hold onto structured completed order details so print modal shows the finalized stats
     setPrintBillData(completedOrder);
@@ -657,8 +663,9 @@ export default function CashierPOS({
     setItemToDelete(itemToRemove);
   };
 
-  const confirmDeleteItem = () => {
+  const confirmDeleteItem = async () => {
     if (!itemToDelete) return;
+    await logAndNotify('Cashier', 'Bỏ món', `Món: ${itemToDelete.productName}`, ['admin', 'cashier']);
     setPosCart(prev => prev.filter(i => i.productId !== itemToDelete.productId));
     setHasChanges(true);
     setItemToDelete(null);
@@ -888,6 +895,8 @@ export default function CashierPOS({
               <Utensils className={`w-5 h-5 ${t.icon}`} /> SƠ ĐỒ BÀN THU NGÂN ({activeTblOrderCount}/{tables.length})
             </h1>
           </div>
+          
+          <NotificationIcon role="cashier" />
           
           {/* Quick status counters */}
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">

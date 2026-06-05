@@ -77,3 +77,45 @@ export function getVietQrBankId(bankName: string): string {
   // Return uppercase alphanumeric inside parentheses as a fallback
   return candidate ? candidate.toUpperCase() : 'MB';
 }
+
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "./firebase";
+
+export async function logAction(staffUsername: string, action: string, details?: string) {
+  try {
+    await addDoc(collection(db, "activityLogs"), {
+      staffUsername,
+      action,
+      details,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    console.error("Error logging action:", err);
+  }
+}
+
+export async function sendNotification(title: string, message: string, roles: ('admin' | 'cashier')[], relatedUrl?: string) {
+  try {
+    // Send separate notification documents for each role
+    for (const role of roles) {
+      const notificationData: any = {
+        title,
+        message,
+        role,
+        isRead: false,
+        createdAt: Date.now(),
+      };
+      if (relatedUrl) {
+        notificationData.relatedUrl = relatedUrl;
+      }
+      await addDoc(collection(db, "notifications"), notificationData);
+    }
+  } catch (err) {
+    console.error("Error sending notifications:", err);
+  }
+}
+
+export async function logAndNotify(staffUsername: string, action: string, details: string, roles: ('admin' | 'cashier')[]) {
+    await logAction(staffUsername, action, details);
+    await sendNotification(action, details, roles);
+}

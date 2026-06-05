@@ -128,3 +128,21 @@ export interface CustomerCookieData {
   customerAddress: string;
   paymentMethod: string;
 }
+
+export interface ActivityLog {
+  id: string;
+  staffUsername: string;
+  action: string;
+  details?: string;
+  timestamp: number;
+}
+
+export interface SystemNotification {
+  id: string;
+  title: string;
+  message: string;
+  role: 'admin' | 'cashier';
+  isRead: boolean;
+  createdAt: number;
+  relatedUrl?: string;
+}
