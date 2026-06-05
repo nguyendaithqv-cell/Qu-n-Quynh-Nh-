@@ -159,6 +159,40 @@ export default function MobileSimulator({
   // Table recognition state
   const [selectedTable, setSelectedTable] = useState<{id: string, name: string} | null>(null);
 
+  // Table confirmation check-in states
+  const [isTableConfirmed, setIsTableConfirmed] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tId = params.get('tableId');
+    if (!tId) return true; // No table, no check-in required
+    return sessionStorage.getItem(`table_confirmed_${tId}`) === 'true';
+  });
+
+  const [checkInName, setCheckInName] = useState<string>('');
+  const [checkInPhone, setCheckInPhone] = useState<string>('');
+  const [checkInError, setCheckInError] = useState<string>('');
+
+  const activeTableOrder = useMemo(() => {
+    if (!selectedTable || !orders || orders.length === 0) return null;
+    return orders.find(order => 
+      order.tableId === selectedTable.id && 
+      order.status !== 'completed' && 
+      order.status !== 'cancelled'
+    );
+  }, [selectedTable, orders]);
+
+  useEffect(() => {
+    if (activeTableOrder) {
+      setCheckInName(activeTableOrder.customerName || '');
+      setCheckInPhone(activeTableOrder.customerPhone || '');
+    } else {
+      const cookieData = getCustomerCookie();
+      if (cookieData && (cookieData.customerName || cookieData.customerPhone)) {
+        setCheckInName(cookieData.customerName || '');
+        setCheckInPhone(cookieData.customerPhone || '');
+      }
+    }
+  }, [activeTableOrder]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tId = params.get('tableId');
@@ -166,6 +200,8 @@ export default function MobileSimulator({
       const table = tables.find(t => t.id === tId);
       if (table) {
         setSelectedTable({ id: table.id, name: table.name });
+        const confirmed = sessionStorage.getItem(`table_confirmed_${table.id}`) === 'true';
+        setIsTableConfirmed(confirmed);
       }
     }
   }, [tables]);
@@ -725,6 +761,145 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
   // Standard standalone mobile header/footer
   return (
     <div className={`${c_theme.pageWrapper} ${!isStandaloneMobile ? 'h-[640px] overflow-hidden' : 'h-screen overflow-hidden'}`}>
+      {/* Table Checking & Customer Identification Screen Overlay */}
+      {selectedTable && !isTableConfirmed && (
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-150 dark:border-slate-800 space-y-5 flex flex-col justify-between max-h-[90vh] overflow-y-auto">
+            
+            {/* Header / Table designation */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-gradient-to-tr from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-xl mx-auto text-white select-none relative">
+                <span className="text-3xl animate-bounce">🪑</span>
+              </div>
+              <p className="text-[10px] uppercase tracking-widest font-extrabold text-orange-600 block pt-1">Xác nhận gọi món tại bàn</p>
+              <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                {selectedTable.name}
+              </h2>
+              <p className="text-slate-400 dark:text-slate-500 text-[11px] leading-relaxed">
+                Chào mừng bạn đến với <strong className="text-slate-700 dark:text-slate-300 font-bold">{storeConfig.name || 'Quán'}</strong>. Vui lòng nhập thông tin để chúng tôi phục vụ bạn chính xác nhất.
+              </p>
+            </div>
+
+            {/* Warning if table currently has active orders */}
+            {activeTableOrder && (
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 space-y-1.5 animate-in slide-in-from-top-2 duration-300 pointer-events-auto">
+                <p className="text-[10.5px] font-black text-amber-800 dark:text-amber-400 flex items-center gap-1">
+                  ⚠️ BÀN ĐANG CÓ MÓN ĂN/UỐNG!
+                </p>
+                <p className="text-[9.5px] text-amber-700 dark:text-amber-500 leading-normal font-semibold">
+                  Hiện tại bàn này đang có đơn hàng từ trước chưa hoàn tất thanh toán. Bạn muốn <strong>gọi thêm món</strong> vào bàn này đúng không?
+                </p>
+                <div className="flex gap-2 pt-1 font-sans">
+                  <div className="text-[8px] bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-bold">
+                    Khách: {activeTableOrder.customerName}
+                  </div>
+                  {activeTableOrder.customerPhone && (
+                    <div className="text-[8px] bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-mono">
+                      SĐT: {activeTableOrder.customerPhone}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Inputs Form */}
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tên của bạn *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400">👤</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nhập tên của bạn hoặc đoàn khách..."
+                    value={checkInName}
+                    onChange={(e) => {
+                      setCheckInName(e.target.value);
+                      if (checkInError) setCheckInError('');
+                    }}
+                    className={`w-full rounded-xl py-2.5 pl-9 pr-4 text-[11px] font-bold border outline-none transition-all ${
+                      checkInError && !checkInName.trim()
+                        ? 'border-red-400 bg-red-50/50 dark:bg-red-950/20'
+                        : 'border-slate-200 dark:border-slate-700 focus:border-orange-500 dark:bg-slate-950 dark:text-white'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Số điện thoại *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400">📞</span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Nhập số điện thoại liên hệ..."
+                    value={checkInPhone}
+                    onChange={(e) => {
+                      setCheckInPhone(e.target.value);
+                      if (checkInError) setCheckInError('');
+                    }}
+                    className={`w-full rounded-xl py-2.5 pl-9 pr-4 text-[11px] font-bold font-mono border outline-none transition-all ${
+                      checkInError && !checkInPhone.trim()
+                        ? 'border-red-400 bg-red-50/50 dark:bg-red-950/20'
+                        : 'border-slate-200 dark:border-slate-700 focus:border-orange-500 dark:bg-slate-950 dark:text-white'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {checkInError && (
+                <p className="text-[10px] font-bold text-red-500 animate-pulse text-center font-sans">
+                  ⚠️ {checkInError}
+                </p>
+              )}
+            </div>
+
+            {/* Check-in submission action button */}
+            <button
+              onClick={() => {
+                if (!checkInName.trim()) {
+                  setCheckInError('Vui lòng nhập Tên của bạn / Tên nhóm!');
+                  return;
+                }
+                if (!checkInPhone.trim()) {
+                  setCheckInError('Vui lòng nhập Số điện thoại liên hệ!');
+                  return;
+                }
+                const phoneClean = checkInPhone.trim().replace(/\s+/g, '');
+                if (phoneClean.length < 9 || phoneClean.length > 11) {
+                  setCheckInError('Số điện thoại không hợp lệ! Vui lòng nhập từ 9 - 11 chữ số.');
+                  return;
+                }
+
+                // Proceed with successful check-in
+                setCustomerName(checkInName.trim());
+                setCustomerPhone(phoneClean);
+                
+                // Keep checkout details consistent
+                setCustomerAddress('Tại bàn: ' + selectedTable.name);
+
+                // Save to cookies
+                setCustomerCookie({
+                  customerName: checkInName.trim(),
+                  customerPhone: phoneClean,
+                  customerAddress: 'Tại bàn: ' + selectedTable.name,
+                  paymentMethod: paymentMethod // current or default
+                });
+
+                // Set confirmed status
+                setIsTableConfirmed(true);
+                sessionStorage.setItem(`table_confirmed_${selectedTable.id}`, 'true');
+              }}
+              className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-500/10 active:scale-[0.98] transition-all uppercase tracking-wider text-[11px] block text-center"
+            >
+              {activeTableOrder ? 'Đồng ý & Gọi thêm món ✓' : 'Xác nhận vào gọi món →'}
+            </button>
+
+          </div>
+        </div>
+      )}
+
       {/* Floating Copy Feedback Toast */}
       {copiedText && (
         <div className="absolute top-[80px] left-1/2 -translate-x-1/2 bg-slate-800 text-white font-black text-[9px] uppercase tracking-wider px-3 py-1.5 rounded-full shadow-xl z-50 flex items-center gap-1 animate-fade-in border border-slate-700">
