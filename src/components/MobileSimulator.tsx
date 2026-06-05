@@ -668,7 +668,7 @@ ${order.promoCodeUsed ? `${promoText}\n` : ''}Tổng thanh toán: ${order.totalA
 Thanh toán: ${payMethodText}
 ${order.note ? `Ghi chú khách: ${order.note}\n` : ''}-------------------------------
 Hotline cửa hàng: ${storeConfig.zaloHotline}
-Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng Quán Nhậu KHAI VỊ!`;
+Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.name || 'Quán Nhậu KHAI VỊ'}!`;
   };
 
   // Copy structured bill to clipboard and redirect to Zalo chat client
@@ -1704,7 +1704,7 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng Quán Nhậu KH
                 <CheckCircle className="w-7 h-7" />
               </div>
               <h1 className="text-lg font-black text-slate-800">Đặt hàng thành công!</h1>
-              <p className="text-[10px] text-slate-400 font-medium">Quán Nhậu KHAI VỊ đã nhận đơn hàng và chuẩn bị chế biến</p>
+              <p className="text-[10px] text-slate-400 font-medium">{storeConfig.name || 'Quán Nhậu KHAI VỊ'} đã nhận đơn hàng và chuẩn bị chế biến</p>
             </div>
 
             {/* Bill Details Invoice */}

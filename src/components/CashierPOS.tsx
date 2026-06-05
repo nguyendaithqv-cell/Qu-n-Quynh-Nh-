@@ -491,7 +491,7 @@ export default function CashierPOS({
       customerName: updatedCustomerName,
       customerPhone: updatedCustomerPhone,
       note: updatedNote,
-      adminNote: (currentOrder.adminNote || '') + ` [Khai vị POS: Đã thanh toán qua ${isPayAsDebt ? 'Ghi nợ sổ sách' : (payingMethod === 'cod' ? 'Tiền mặt' : 'Chuyển khoản QR')}]`
+      adminNote: (currentOrder.adminNote || '') + ` [${storeConfig.name || 'Hệ Thống'} POS: Đã thanh toán qua ${isPayAsDebt ? 'Ghi nợ sổ sách' : (payingMethod === 'cod' ? 'Tiền mặt' : 'Chuyển khoản QR')}]`
     };
 
     onUpdateOrders(orders.map(o => o.id === currentOrder.id ? completedOrder : o));

@@ -133,9 +133,34 @@ export default function App() {
 
   const adminTheme = storeConfig.theme || 'standard';
 
+  // Helper to extract initials and dynamic subtitle for branding
+  const getStoreLogoInfo = () => {
+    const rawName = storeConfig.name || 'Khai Vị';
+    // Remove common prefixes
+    const cleanName = rawName.replace(/^(Quán Nhậu|Quan Nhau|Quán|Quan|Cửa hàng|Cua hang|Nhà hàng|Nha hang)\s+/i, '');
+    const words = cleanName.trim().split(/\s+/).filter(Boolean);
+    let initials = 'KV';
+    let subtitle = 'Khai Vị';
+    
+    if (words.length >= 2) {
+      initials = (words[0][0] + words[1][0]).toUpperCase();
+      subtitle = words[0];
+    } else if (words.length === 1 && words[0]) {
+      initials = words[0].slice(0, 2).toUpperCase();
+      subtitle = words[0];
+    }
+    
+    if (subtitle.length > 7) {
+      subtitle = subtitle.slice(0, 6) + '.';
+    }
+    return { initials, subtitle };
+  };
+  
+  const logoInfo = getStoreLogoInfo();
+
   // Dynamic Browser Tab Title Management
   useEffect(() => {
-    const baseName = storeConfig.storeName || 'Khai Vị POS';
+    const baseName = storeConfig.name || 'Khai Vị POS';
     let pageTitle = baseName;
 
     if (isMobileViewport) {
@@ -161,7 +186,7 @@ export default function App() {
     }
 
     document.title = pageTitle;
-  }, [isAdminAuthenticated, adminViewMode, mobileMode, isMobileViewport, storeConfig.storeName]);
+  }, [isAdminAuthenticated, adminViewMode, mobileMode, isMobileViewport, storeConfig.name]);
 
   // Monitor screen size to supply genuine mobile adaptation
   useEffect(() => {
@@ -490,8 +515,8 @@ export default function App() {
           {/* Brand logo & Header */}
           <div className="flex flex-col items-center text-center mb-8">
             <div className="w-16 h-16 bg-orange-600 rounded-2xl flex flex-col items-center justify-center font-black text-white text-2xl shadow-xl select-none mb-4">
-              KV
-              <span className="text-[8px] text-orange-200 font-extrabold uppercase tracking-tighter block -mt-1">Khai Vị</span>
+              {logoInfo.initials}
+              <span className="text-[8px] text-orange-200 font-extrabold uppercase tracking-tighter block -mt-1">{logoInfo.subtitle}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase">
               CHỌN PHÂN HỆ LÀM VIỆC ⚙_
@@ -606,8 +631,8 @@ export default function App() {
             <span className="sr-only">Đang đồng bộ</span>
           </div>
           <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center font-black text-orange-600 text-[10px] shadow-lg mb-4 select-none">
-            KV
-            <span className="text-[5px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">Khai Vị</span>
+            {logoInfo.initials}
+            <span className="text-[5px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">{logoInfo.subtitle}</span>
           </div>
           <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">Hệ Thống Đang Đồng Bộ...</h2>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
@@ -778,8 +803,8 @@ export default function App() {
           <div className={`${ch.headerBg} p-3 py-6 shrink-0 flex items-center justify-between`}>
             <div className="flex items-center gap-4">
               <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center font-black text-[13px] shadow-sm select-none ${ch.logoBg}`}>
-                KV
-                <span className="text-[5.5px] font-extrabold uppercase tracking-tighter block -mt-1.5 font-sans">Khai Vị</span>
+                {logoInfo.initials}
+                <span className="text-[5.5px] font-extrabold uppercase tracking-tighter block -mt-1.5 font-sans">{logoInfo.subtitle}</span>
               </div>
               <div>
                 <span className={`${ch.subText} uppercase text-[8.5px] tracking-widest block leading-tight`}>CHỦ TIỆM ĐANG SỬ DỤNG</span>
@@ -842,8 +867,8 @@ export default function App() {
         <div className="flex flex-col items-center gap-10">
           {/* Logo brand */}
           <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center font-black text-orange-600 text-lg shadow-lg border border-orange-100 select-none cursor-default">
-            KV
-            <span className="text-[7px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">Khai Vị</span>
+            {logoInfo.initials}
+            <span className="text-[7px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">{logoInfo.subtitle}</span>
           </div>
  
           {/* Quick Menu Icons (Stylized layout decorations) */}
