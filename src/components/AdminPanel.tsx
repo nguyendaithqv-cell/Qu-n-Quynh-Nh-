@@ -41,6 +41,7 @@ import { Product, Category, Order, OrderStatus, PaymentStatus, StoreConfig, Prom
 import ReportSection from './ReportSection';
 import NotificationIcon from './NotificationIcon';
 import ActivityLogs from './ActivityLogs';
+import BackupRestore from './BackupRestore';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { logAndNotify } from '../utils';
@@ -4230,6 +4231,23 @@ export default function AdminPanel({
       {/* 8. SYSTEM CONFIGURATION */}
       {activeTab === 'system' && (
         <div className="space-y-6 animate-fade-in text-xs">
+          <BackupRestore
+            products={products}
+            categories={categories}
+            promotions={promotions}
+            storeConfig={storeConfig}
+            orders={orders}
+            tables={tables}
+            areas={areas}
+            onUpdateOrders={onUpdateOrders}
+            onUpdateProducts={onUpdateProducts}
+            onUpdateCategories={onUpdateCategories}
+            onUpdatePromotions={onUpdatePromotions}
+            onUpdateTables={onUpdateTables}
+            onUpdateAreas={onUpdateAreas}
+            onUpdateStoreConfig={onUpdateStoreConfig}
+            themeStyles={t}
+          />
           <div className={`${t.card}`}>
             <button 
               onClick={() => setShowLogs(!showLogs)}
