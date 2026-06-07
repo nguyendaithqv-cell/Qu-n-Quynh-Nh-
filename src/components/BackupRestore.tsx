@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Save, Upload, AlertCircle } from 'lucide-react';
+import { Save, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { Product, Category, Order, Promotion, Table, Area, StoreConfig } from '../types';
+import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface BackupRestoreProps {
   products: Product[];
@@ -27,6 +29,7 @@ export default function BackupRestore({
 }: BackupRestoreProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleBackup = () => {
     const backupData = {
@@ -45,7 +48,7 @@ export default function BackupRestore({
     URL.revokeObjectURL(url);
   };
 
-  const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -53,16 +56,49 @@ export default function BackupRestore({
       return;
     }
 
+    setIsRestoring(true);
+    setProgress(10);
+
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = JSON.parse(evt.target?.result as string);
         
-        // Basic validation
         if (!data.products || !data.categories) {
           throw new Error("File không đúng định dạng dữ liệu.");
         }
 
+        setProgress(30);
+
+        // Perform Firestore updates
+        const batch = writeBatch(db);
+        
+        const itemsToSave = [
+            { col: 'products', items: data.products },
+            { col: 'categories', items: data.categories },
+            { col: 'promotions', items: data.promotions || [] },
+            { col: 'orders', items: data.orders || [] },
+            { col: 'tables', items: data.tables || [] },
+            { col: 'areas', items: data.areas || [] },
+        ];
+        
+        itemsToSave.forEach(({ col, items }) => {
+            items.forEach((item: any) => {
+                const itemRef = doc(db, col, item.id);
+                batch.set(itemRef, item);
+            });
+        });
+        
+        // Save storeConfig
+        if(data.storeConfig) {
+            batch.set(doc(db, 'storeConfig', 'global'), data.storeConfig);
+        }
+
+        setProgress(60);
+        await batch.commit();
+        setProgress(90);
+
+        // Update local state
         onUpdateProducts(data.products || []);
         onUpdateCategories(data.categories || []);
         onUpdatePromotions(data.promotions || []);
@@ -71,15 +107,16 @@ export default function BackupRestore({
         onUpdateTables(data.tables || []);
         onUpdateAreas(data.areas || []);
         
+        setProgress(100);
         alert("Phục hồi dữ liệu thành công!");
       } catch (err) {
         console.error(err);
         alert("Có lỗi xảy ra khi phục hồi dữ liệu: " + (err instanceof Error ? err.message : 'Unknown error'));
       } finally {
         setIsRestoring(false);
+        setProgress(0);
       }
     };
-    setIsRestoring(true);
     reader.readAsText(file);
   };
 
@@ -100,7 +137,7 @@ export default function BackupRestore({
           disabled={isRestoring}
           className={`${t.btnAccent} flex items-center gap-2`}
         >
-          <Upload className="w-4 h-4" /> {isRestoring ? 'Đang phục hồi...' : 'Phục hồi từ file'}
+          {isRestoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} {isRestoring ? 'Đang phục hồi...' : 'Phục hồi từ file'}
         </button>
         <input 
           type="file" 
@@ -110,6 +147,17 @@ export default function BackupRestore({
           className="hidden" 
         />
       </div>
+      {isRestoring && (
+          <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-slate-500">
+                  <span>Tiến trình</span>
+                  <span>{progress}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-orange-500 transition-all duration-300" style={{width: `${progress}%`}} />
+              </div>
+          </div>
+      )}
       <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
         <AlertCircle className="w-3 h-3" /> Sao lưu JSON giúp bạn lưu trữ toàn bộ dữ liệu hiện tại xuống máy tính và phục hồi bất cứ khi nào.
       </p>

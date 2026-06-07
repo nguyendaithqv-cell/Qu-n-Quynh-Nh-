@@ -1344,7 +1344,7 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                 <p className="text-[9.5px] text-amber-700 dark:text-amber-500 leading-normal font-semibold">
                   Hiện tại bàn này đang có đơn hàng từ trước chưa hoàn tất thanh toán. Bạn muốn <strong>gọi thêm món</strong> vào bàn này đúng không?
                 </p>
-                <div className="flex gap-2 pt-1 font-sans">
+                <div className="flex gap-2 pt-1 font-sans flex-wrap">
                   <div className="text-[8px] bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-bold">
                     Khách: {activeTableOrder.customerName}
                   </div>
@@ -1354,6 +1354,19 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                     </div>
                   )}
                 </div>
+                {activeTableOrder.items && activeTableOrder.items.length > 0 && (
+                  <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 mt-1">
+                    <p className="text-[9px] font-bold text-amber-900 dark:text-amber-300 pb-1">Món đã gọi:</p>
+                    <ul className="space-y-0.5 max-h-24 overflow-y-auto">
+                      {activeTableOrder.items.map((item, idx) => (
+                        <li key={idx} className="flex justify-between text-[9px] text-amber-800 dark:text-amber-400">
+                          <span>{item.productName}</span>
+                          <span className="font-bold">x{item.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
