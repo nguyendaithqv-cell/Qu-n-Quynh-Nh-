@@ -23,7 +23,9 @@ import {
   ArrowLeft,
   Clock,
   MessageCircle,
-  Settings
+  Settings,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Product, Category, Order, StoreConfig, Promotion, CartItem, CustomerCookieData, Table } from '../types';
 import { setCustomerCookie, getCustomerCookie } from '../data';
@@ -76,6 +78,8 @@ export default function MobileSimulator({
 
   // Clipboard copy state & handler
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [showActiveItems, setShowActiveItems] = useState(false);
+
   const handleCopyText = (text: string, label: string) => {
     const textArea = document.createElement('textarea');
     textArea.value = text;
@@ -1356,15 +1360,23 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                 </div>
                 {activeTableOrder.items && activeTableOrder.items.length > 0 && (
                   <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 mt-1">
-                    <p className="text-[9px] font-bold text-amber-900 dark:text-amber-300 pb-1">Món đã gọi:</p>
-                    <ul className="space-y-0.5 max-h-24 overflow-y-auto">
-                      {activeTableOrder.items.map((item, idx) => (
-                        <li key={idx} className="flex justify-between text-[9px] text-amber-800 dark:text-amber-400">
-                          <span>{item.productName}</span>
-                          <span className="font-bold">x{item.quantity}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <button 
+                      onClick={() => setShowActiveItems(!showActiveItems)}
+                      className="flex items-center justify-between w-full text-[9px] font-bold text-amber-900 dark:text-amber-300 pb-1"
+                    >
+                      <span>Xem các món đã chọn</span>
+                      {showActiveItems ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                    {showActiveItems && (
+                      <ul className="space-y-0.5 max-h-24 overflow-y-auto mt-1">
+                        {activeTableOrder.items.map((item, idx) => (
+                          <li key={idx} className="flex justify-between text-[9px] text-amber-800 dark:text-amber-400">
+                            <span>{item.productName}</span>
+                            <span className="font-bold">x{item.quantity}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </div>
