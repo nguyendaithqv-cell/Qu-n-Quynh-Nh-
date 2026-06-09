@@ -158,6 +158,8 @@ export default function MobileSimulator({
   const [wantsDeliveryTime, setWantsDeliveryTime] = useState<boolean>(false);
   const [deliveryTime, setDeliveryTime] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('cod'); // 'cod' | 'banking'
+  const [totalDeposit, setTotalDeposit] = useState<number>(0);
+  
   const [saveCookie, setSaveCookie] = useState<boolean>(true);
 
   // Checkout Success Bill State
@@ -167,6 +169,61 @@ export default function MobileSimulator({
 
   // Table recognition state
   const [selectedTable, setSelectedTable] = useState<{id: string, name: string} | null>(null);
+  const showPayment = true;
+  const paymentContent = (
+    <div className="pt-2 border-t border-slate-100 space-y-1.5">
+      <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
+        <CreditCard className="w-3.5 h-3.5 text-orange-600" /> Hình thức thanh toán
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setPaymentMethod('cod')}
+          className={`p-2.5 border rounded-xl text-left transition-all ${
+            paymentMethod === 'cod'
+              ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
+              : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
+          }`}
+        >
+          <p className="text-[11px]">Tiền mặt COD</p>
+          <p className="text-[8px] text-slate-400 font-medium">Nhận hàng trả tiền</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPaymentMethod('banking')}
+          className={`p-2.5 border rounded-xl text-left transition-all ${
+            paymentMethod === 'banking'
+              ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
+              : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
+          }`}
+        >
+          <p className="text-[11px]">Chuyển khoản</p>
+          <p className="text-[8px] text-slate-400 font-medium">Quét mã QR ngân hàng</p>
+        </button>
+      </div>
+
+      {paymentMethod === 'banking' && (
+        <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-2 text-slate-700 animate-fade-in text-[10px] leading-relaxed">
+          <p className="font-bold text-blue-800 flex items-center gap-1">
+            <Info className="w-3 h-3 text-blue-700" /> HƯỚNG DẪN CHUYỂN KHOẢN NGÂN HÀNG:
+          </p>
+          <div className="flex items-center gap-3">
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Bank:${storeConfig.bankName}|Account:${storeConfig.bankAccount}|Name:${storeConfig.bankAccountName}|Amount:${totalDeposit}`}
+              alt="QR Code"
+              className="w-20 h-20 rounded-lg"
+            />
+            <div className="pl-1 space-y-0.5 text-slate-600 flex-1">
+                <p>🏦 Ngân hàng: <strong className="text-slate-800">{storeConfig.bankName}</strong></p>
+                <p>💳 Số tài khoản: <strong className="text-slate-800">{storeConfig.bankAccount}</strong></p>
+                <p>👤 Chủ tài khoản: <strong className="text-slate-800 uppercase">{storeConfig.bankAccountName}</strong></p>
+                <p>📝 Nội dung: <strong className="text-orange-600 text-[11px] font-mono font-bold tracking-wider">{customerName ? customerName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toUpperCase() : "TEN KHACH HANG"} Chuyen tien</strong></p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Table confirmation check-in states
   const [isTableConfirmed, setIsTableConfirmed] = useState<boolean>(() => {
@@ -188,6 +245,10 @@ export default function MobileSimulator({
 
   const [bookingTime, setBookingTime] = useState<string>(() => {
     return sessionStorage.getItem('booking_time') || '';
+  });
+
+  const [bookingDate, setBookingDate] = useState<string>(() => {
+    return sessionStorage.getItem('booking_date') || new Date().toISOString().split('T')[0];
   });
 
   const [bookingGuests, setBookingGuests] = useState<string>(() => {
@@ -659,7 +720,7 @@ export default function MobileSimulator({
     // Prepare final note with utensil info if selected
     let finalNote = customerNote.trim();
     if (selectedTable?.id === 'BOOKING') {
-      const bookingInfo = `[Đặt trước: ${bookingTime}]${bookingGuests ? ` [Khách: ${bookingGuests}]` : ''}`;
+      const bookingInfo = `[Đặt trước: ${bookingDate}, ${bookingTime}]${bookingGuests ? ` [Khách: ${bookingGuests}]` : ''}`;
       finalNote = finalNote ? `${bookingInfo} | ${finalNote}` : bookingInfo;
     }
 
@@ -697,6 +758,7 @@ export default function MobileSimulator({
       subTotal: sub,
       discountAmount: discount,
       totalAmount: total,
+      depositAmount: selectedTable?.id === 'BOOKING' && totalDeposit > 0 ? totalDeposit : undefined,
       promoCodeUsed: appliedPromo?.code || undefined,
       status: 'pending',
       paymentStatus: 'unpaid',
@@ -2230,7 +2292,7 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
               {/* Delivery Checkout Info Form */}
               <form onSubmit={handlePlaceOrder} className="pt-3 border-t border-slate-100 space-y-3 pb-8">
                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-orange-600" /> Thông tin giao hàng
+                  <User className="w-3.5 h-3.5 text-orange-600" /> {selectedTable?.id === 'BOOKING' ? 'Thông tin đặt chỗ' : 'Thông tin khách hàng'}
                 </p>
 
                 <div className="space-y-2.5">
@@ -2258,22 +2320,48 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                     <Phone className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                   </div>
 
-                  <div className="relative">
-                    <input 
-                      type="text" 
-                      placeholder="Địa chỉ giao cụ thể" 
-                      required
-                      value={customerAddress}
-                      onChange={(e) => setCustomerAddress(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs font-medium focus:ring-1 focus:ring-orange-200 focus:bg-white transition-all outline-none text-slate-800"
-                    />
-                    <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                  </div>
+                  {selectedTable?.id === 'SHIP' && (
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Địa chỉ giao cụ thể" 
+                        required
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs font-medium focus:ring-1 focus:ring-orange-200 focus:bg-white transition-all outline-none text-slate-800"
+                      />
+                      <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                    </div>
+                  )}
+
+                  {selectedTable?.id === 'BOOKING' && (
+                    <div className="bg-blue-50/50 p-3 rounded-xl mb-3 space-y-2">
+                       <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-slate-700 w-20">Thời gian:</label>
+                          <input type="date" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); sessionStorage.setItem('booking_date', e.target.value); }} className="text-[10px] bg-white border border-slate-200 p-1 flex-1 rounded text-slate-700" />
+                          <input type="time" value={bookingTime} onChange={(e) => setBookingTime(e.target.value)} className="text-[10px] bg-white border border-slate-200 p-1 w-20 rounded text-slate-700" />
+                       </div>
+                       <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-slate-700 w-20">Số người:</label>
+                          <input type="number" placeholder="Số người" value={bookingGuests} onChange={(e) => setBookingGuests(e.target.value)} className="text-[10px] bg-white border border-slate-200 p-1 flex-1 rounded text-slate-700" />
+                       </div>
+                      <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-slate-700 w-20">Đặt cọc (VNĐ):</label>
+                          <input 
+                            type="number" 
+                            placeholder="Nhập số tiền..."
+                            value={totalDeposit}
+                            onChange={(e) => setTotalDeposit(Number(e.target.value))}
+                            className="text-[10px] bg-white border border-slate-200 p-1 flex-1 rounded text-slate-700"
+                          />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="relative">
                     <input 
                       type="text" 
-                      placeholder="Ghi chú người bán (ví dụ: Không hành, nhiều ớt...)" 
+                      placeholder={selectedTable?.id === 'BOOKING' ? "Ví dụ: Bàn yên tĩnh, gần cửa sổ..." : "Ghi chú người bán (ví dụ: Không hành, nhiều ớt...)"} 
                       value={customerNote}
                       onChange={(e) => setCustomerNote(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs font-medium focus:ring-1 focus:ring-orange-200 focus:bg-white transition-all outline-none text-slate-800"
@@ -2281,74 +2369,75 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                     <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                   </div>
 
-                  {/* Extra Options: Utensils and Delivery Time */}
-                  <div className="py-0.5 space-y-2">
-                    {/* Utensils Option */}
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <div className="relative flex items-center">
-                          <input 
-                            type="checkbox" 
-                            checked={wantsUtensils}
-                            onChange={(e) => setWantsUtensils(e.target.checked)}
-                            className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-orange-600 transition-colors">Thêm dụng cụ ăn uống</span>
-                      </label>
-
-                      {wantsUtensils && (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                           <div className="flex items-center gap-1.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
-                              <button 
-                                type="button"
-                                onClick={() => setUtensilsCount(Math.max(1, utensilsCount - 1))}
-                                className="w-5 h-5 flex items-center justify-center bg-slate-50 text-slate-600 rounded-md active:scale-90"
-                              >
-                                <Minus className="w-2.5 h-2.5" />
-                              </button>
-                              <span className="min-w-[14px] text-center text-[11px] font-black text-orange-600">{utensilsCount}</span>
-                              <button 
-                                type="button"
-                                onClick={() => setUtensilsCount(Math.min(20, utensilsCount + 1))}
-                                className="w-5 h-5 flex items-center justify-center bg-slate-50 text-slate-600 rounded-md active:scale-90"
-                              >
-                                <Plus className="w-2.5 h-2.5" />
-                              </button>
-                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Delivery Time Option */}
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <div className="relative flex items-center">
-                          <input 
-                            type="checkbox" 
-                            checked={wantsDeliveryTime}
-                            onChange={(e) => setWantsDeliveryTime(e.target.checked)}
-                            className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-orange-600 transition-colors">Chọn giờ giao hàng</span>
-                      </label>
-
-                      {wantsDeliveryTime && (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                           <div className="flex items-center gap-1.5 bg-white rounded-lg px-2 py-1 border border-slate-200 shadow-sm">
-                              <Clock className="w-3 h-3 text-orange-600 shrink-0" />
+                  {selectedTable?.id === 'SHIP' && (
+                    <div className="py-0.5 space-y-2">
+                        {/* Utensils Option */}
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2.5 cursor-pointer group">
+                            <div className="relative flex items-center">
                               <input 
-                                type="time" 
-                                value={deliveryTime}
-                                onChange={(e) => setDeliveryTime(e.target.value)}
-                                className="bg-transparent border-none text-[11px] font-black text-orange-600 outline-none p-0 focus:ring-0 w-16"
+                                type="checkbox" 
+                                checked={wantsUtensils}
+                                onChange={(e) => setWantsUtensils(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                               />
-                           </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-orange-600 transition-colors">Thêm dụng cụ ăn uống</span>
+                          </label>
+
+                          {wantsUtensils && (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                               <div className="flex items-center gap-1.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
+                                  <button 
+                                    type="button"
+                                    onClick={() => setUtensilsCount(Math.max(1, utensilsCount - 1))}
+                                    className="w-5 h-5 flex items-center justify-center bg-slate-50 text-slate-600 rounded-md active:scale-90"
+                                  >
+                                    <Minus className="w-2.5 h-2.5" />
+                                  </button>
+                                  <span className="min-w-[14px] text-center text-[11px] font-black text-orange-600">{utensilsCount}</span>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setUtensilsCount(Math.min(20, utensilsCount + 1))}
+                                    className="w-5 h-5 flex items-center justify-center bg-slate-50 text-slate-600 rounded-md active:scale-90"
+                                  >
+                                    <Plus className="w-2.5 h-2.5" />
+                                  </button>
+                               </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        {/* Delivery Time Option */}
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2.5 cursor-pointer group">
+                            <div className="relative flex items-center">
+                              <input 
+                                type="checkbox" 
+                                checked={wantsDeliveryTime}
+                                onChange={(e) => setWantsDeliveryTime(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                              />
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight group-hover:text-orange-600 transition-colors">Chọn giờ giao hàng</span>
+                          </label>
+
+                          {wantsDeliveryTime && (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                               <div className="flex items-center gap-1.5 bg-white rounded-lg px-2 py-1 border border-slate-200 shadow-sm">
+                                  <Clock className="w-3 h-3 text-orange-600 shrink-0" />
+                                  <input 
+                                    type="time" 
+                                    value={deliveryTime}
+                                    onChange={(e) => setDeliveryTime(e.target.value)}
+                                    className="bg-transparent border-none text-[11px] font-black text-orange-600 outline-none p-0 focus:ring-0 w-16"
+                                  />
+                               </div>
+                            </div>
+                          )}
+                        </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Cookie Checkbox Option */}
@@ -2361,56 +2450,57 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                     className="mt-0.5 rounded border-slate-300 accent-orange-600 focus:ring-orange-400 h-3.5 w-3.5"
                   />
                   <label htmlFor="save_cookie" className="text-[10px] font-medium text-slate-500 cursor-pointer select-none">
-                    Ghi nhớ thông tin giao hàng của tôi cho lần sau <span className="text-orange-600 font-semibold">(Sử dụng Cookie)</span>
+                    Ghi nhớ thông tin của tôi cho lần sau <span className="text-orange-600 font-semibold">(Sử dụng Cookie)</span>
                   </label>
                 </div>
 
                 {/* Payment Method Selector */}
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <CreditCard className="w-3.5 h-3.5 text-orange-600" /> Hình thức thanh toán
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('cod')}
-                      className={`p-2.5 border rounded-xl text-left transition-all ${
-                        paymentMethod === 'cod'
-                          ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
-                      }`}
-                    >
-                      <p className="text-[11px]">Tiền mặt COD</p>
-                      <p className="text-[8px] text-slate-400 font-medium">Nhận hàng trả tiền</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('banking')}
-                      className={`p-2.5 border rounded-xl text-left transition-all ${
-                        paymentMethod === 'banking'
-                          ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
-                      }`}
-                    >
-                      <p className="text-[11px]">Chuyển khoản</p>
-                      <p className="text-[8px] text-slate-400 font-medium">Quét mã QR ngân hàng</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Display Banking Transfer Instructions if selected */}
-                {paymentMethod === 'banking' && (
-                  <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1 text-slate-700 animate-fade-in text-[10px] leading-relaxed">
-                    <p className="font-bold text-blue-800 flex items-center gap-1">
-                      <Info className="w-3 h-3 text-blue-700" /> HƯỚNG DẪN CHUYỂN KHOẢN NGÂN HÀNG:
+                {showPayment && (
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                      <CreditCard className="w-3.5 h-3.5 text-orange-600" /> Hình thức thanh toán
                     </p>
-                    <div className="pl-1 space-y-0.5 text-slate-600">
-                      <p>🏦 Ngân hàng: <strong className="text-slate-800">{storeConfig.bankName}</strong></p>
-                      <p>💳 Số tài khoản: <strong className="text-slate-800">{storeConfig.bankAccount}</strong></p>
-                      <p>👤 Chủ tài khoản: <strong className="text-slate-800 uppercase">{storeConfig.bankAccountName}</strong></p>
-                      <p>📝 Nội dung chuyển khoản cần ghi: <strong className="text-orange-600 text-[11px] font-mono font-bold tracking-wider">{customerName ? customerName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toUpperCase() : "TEN KHACH HANG"} Chuyen tien</strong></p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('cod')}
+                        className={`p-2.5 border rounded-xl text-left transition-all ${
+                          paymentMethod === 'cod'
+                            ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
+                        }`}
+                      >
+                        <p className="text-[11px]">Tiền mặt COD</p>
+                        <p className="text-[8px] text-slate-400 font-medium">Nhận hàng trả tiền</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('banking')}
+                        className={`p-2.5 border rounded-xl text-left transition-all ${
+                          paymentMethod === 'banking'
+                            ? 'border-orange-600 bg-orange-50/50 text-orange-600 font-bold'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-600 font-semibold'
+                        }`}
+                      >
+                        <p className="text-[11px]">Chuyển khoản</p>
+                        <p className="text-[8px] text-slate-400 font-medium">Quét mã QR ngân hàng</p>
+                      </button>
                     </div>
+
+                    {paymentMethod === 'banking' && (
+                      <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1 text-slate-700 animate-fade-in text-[10px] leading-relaxed">
+                        <p className="font-bold text-blue-800 flex items-center gap-1">
+                          <Info className="w-3 h-3 text-blue-700" /> HƯỚNG DẪN CHUYỂN KHOẢN NGÂN HÀNG:
+                        </p>
+                        <div className="pl-1 space-y-0.5 text-slate-600">
+                          <p>🏦 Ngân hàng: <strong className="text-slate-800">{storeConfig.bankName}</strong></p>
+                          <p>💳 Số tài khoản: <strong className="text-slate-800">{storeConfig.bankAccount}</strong></p>
+                          <p>👤 Chủ tài khoản: <strong className="text-slate-800 uppercase">{storeConfig.bankAccountName}</strong></p>
+                          <p>📝 Nội dung chuyển khoản cần ghi: <strong className="text-orange-600 text-[11px] font-mono font-bold tracking-wider">{customerName ? customerName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toUpperCase() : "TEN KHACH HANG"} Chuyen tien</strong></p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2427,9 +2517,15 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                     </div>
                   )}
                   <div className="flex justify-between items-center font-bold text-slate-800 pt-0.5 text-sm">
-                    <span>Tổng thanh toán</span>
-                    <span className="font-mono text-orange-600 text-base">{getTotal().toLocaleString('vi-VN')}đ</span>
+                    <span>{selectedTable?.id === 'BOOKING' ? "Tạm tính" : "Tổng thanh toán"}</span>
+                    <span className="font-mono text-slate-800 text-sm">{getSubtotal().toLocaleString('vi-VN')}đ</span>
                   </div>
+                  {totalDeposit > 0 && selectedTable?.id === 'BOOKING' && (
+                     <div className="flex justify-between items-center font-bold text-orange-600 pt-0.5 text-sm">
+                        <span>Số tiền đặt cọc</span>
+                        <span className="font-mono text-orange-600 text-sm">{totalDeposit.toLocaleString('vi-VN')}đ</span>
+                     </div>
+                  )}
                 </div>
 
                 {/* Place Order CTA */}
@@ -2517,6 +2613,13 @@ Cảm ơn quý khách đã tin cậy nâng niu khẩu vị cùng ${storeConfig.n
                   <div className="flex justify-between text-green-600 font-bold">
                     <span>Mã giảm ({recentPlacedOrder.promoCodeUsed}):</span>
                     <span className="font-mono">-{recentPlacedOrder.discountAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                {/* Additional info for Booking */}
+                {recentPlacedOrder.tableId === 'BOOKING' && recentPlacedOrder.depositAmount && recentPlacedOrder.depositAmount > 0 && (
+                  <div className="flex justify-between text-orange-600 font-bold">
+                     <span>Số tiền đặt cọc:</span>
+                     <span className="font-mono">{recentPlacedOrder.depositAmount.toLocaleString('vi-VN')}đ</span>
                   </div>
                 )}
                 <div className="flex justify-between text-[13px] font-black text-orange-600 pt-1 border-t border-slate-100">
