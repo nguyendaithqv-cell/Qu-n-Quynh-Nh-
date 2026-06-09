@@ -538,9 +538,11 @@ export default function CashierPOS({
   // Dynamic Cashier change refund
   const refundCashBack = useMemo(() => {
     const cash = parseFloat(customerPaidCash.replace(/\./g, '')) || 0;
-    if (cash < finalCheckoutAmount) return 0;
-    return cash - finalCheckoutAmount;
-  }, [customerPaidCash, finalCheckoutAmount]);
+    const deposit = currentActiveOrder?.depositAmount || 0;
+    const finalAmountToPay = Math.max(0, finalCheckoutAmount - deposit);
+    if (cash < finalAmountToPay) return 0;
+    return cash - finalAmountToPay;
+  }, [customerPaidCash, finalCheckoutAmount, currentActiveOrder]);
 
   // Complete Payment Action
   const handleFinalizePayment = async () => {
@@ -1074,6 +1076,12 @@ export default function CashierPOS({
                         <span className="text-[9.5px] uppercase font-bold opacity-75">Tổng:</span>
                         <span>{tbl.activeOrder.totalAmount.toLocaleString('vi-VN')}đ</span>
                       </div>
+                      {(tbl.activeOrder.depositAmount ?? 0) > 0 && (
+                        <div className="font-extrabold font-mono text-[10.5px] tracking-tight flex items-baseline justify-between text-orange-600">
+                          <span className="text-[9.5px] uppercase font-bold opacity-75">Cọc:</span>
+                          <span>{(tbl.activeOrder.depositAmount ?? 0).toLocaleString('vi-VN')}đ</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex justify-between items-center text-[9.5px] text-slate-400 font-bold">
@@ -1213,7 +1221,10 @@ export default function CashierPOS({
                 <p className="text-[#0078d4]">SĐT: {currentActiveOrder.customerPhone}</p>
               )}
               {currentActiveOrder.note && (
-                <p className="text-rose-500 italic font-medium">Yêu cầu: "{currentActiveOrder.note}"</p>
+                <p className="text-rose-500 italic font-medium">
+                  Yêu cầu: "{currentActiveOrder.note}"
+                  {(currentActiveOrder.depositAmount ?? 0) > 0 && ` (Cọc: ${currentActiveOrder.depositAmount?.toLocaleString('vi-VN')}đ)`}
+                </p>
               )}
             </div>
           )}
@@ -1695,9 +1706,15 @@ export default function CashierPOS({
                   <div className={`flex justify-between pt-1.5 border-t ${cm.borderClass} font-black ${cm.textPrimary} text-sm`}>
                     <span>Thực thanh toán:</span>
                     <span className="font-mono text-rose-500 font-black">
-                      {finalCheckoutAmount.toLocaleString('vi-VN')} đ
+                      {(finalCheckoutAmount - (currentActiveOrder.depositAmount || 0)).toLocaleString('vi-VN')} đ
                     </span>
                   </div>
+                  {(currentActiveOrder.depositAmount ?? 0) > 0 && (
+                    <div className="flex justify-between text-[11px] font-bold text-orange-600">
+                      <span>Đặt cọc đã trừ:</span>
+                      <span className="font-mono">-{ (currentActiveOrder.depositAmount ?? 0).toLocaleString('vi-VN')} đ</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
