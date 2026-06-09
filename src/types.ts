@@ -73,6 +73,7 @@ export interface Order {
   subTotal: number;
   discountAmount: number;
   totalAmount: number;
+  depositAmount?: number;
   promoCodeUsed?: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
