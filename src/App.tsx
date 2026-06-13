@@ -44,6 +44,12 @@ import {
   OperationType,
   cleanForFirestore
 } from './firebase';
+import { 
+  sendTelegramMessage, 
+  formatNewOrderMessage, 
+  formatOrderStatusChangeMessage, 
+  checkAndSendAutoSummary 
+} from './utils/telegram';
 
 export default function App() {
   // Load initial local dataset as high-performance local cache
@@ -428,6 +434,20 @@ export default function App() {
     };
   }, []);
 
+  // Automated background scheduler for Telegram daily sumaries
+  useEffect(() => {
+    if (storeConfig.telegram?.enabled && storeConfig.telegram?.notifySummaryEnabled) {
+      const intervalId = setInterval(() => {
+        checkAndSendAutoSummary(orders, storeConfig, handleUpdateStoreConfig);
+      }, 30000); // Check every 30 seconds
+      
+      // Run once immediately on mount or config activation
+      checkAndSendAutoSummary(orders, storeConfig, handleUpdateStoreConfig);
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [orders, storeConfig]);
+
   // Unified dynamic sync helper for modifying collections based on arrays of data
   const syncWithFirestore = async <T extends { id: string }>(
     collectionName: string,
@@ -468,6 +488,12 @@ export default function App() {
     try {
       // 2. Perform live setDoc in Firestore - wrap in cleanForFirestore
       await setDoc(doc(db, 'orders', newOrder.id), cleanForFirestore(newOrder));
+
+      // 3. Trigger Telegram Notification
+      if (storeConfig.telegram?.enabled && storeConfig.telegram?.notifyNewOrder && storeConfig.telegram.botToken && storeConfig.telegram.chatId) {
+        const msg = formatNewOrderMessage(newOrder, storeConfig.name);
+        sendTelegramMessage(storeConfig.telegram.botToken, storeConfig.telegram.chatId, msg);
+      }
     } catch (e) {
       // Revert optimistic state back on write failure
       setOrders(prev => prev.filter(o => o.id !== newOrder.id));
@@ -476,6 +502,33 @@ export default function App() {
   };
 
   const handleUpdateOrders = async (updatedOrders: Order[]) => {
+    // Check transitions before syncing for Telegram notifications
+    if (storeConfig.telegram?.enabled && storeConfig.telegram.botToken && storeConfig.telegram.chatId) {
+      for (const updated of updatedOrders) {
+        const original = orders.find(o => o.id === updated.id);
+        if (original) {
+          const statusChanged = original.status !== updated.status;
+          const paymentChanged = original.paymentStatus !== updated.paymentStatus;
+          
+          if (statusChanged || paymentChanged) {
+            let shouldNotify = false;
+            
+            if (updated.status === 'cancelled' && original.status !== 'cancelled' && storeConfig.telegram.notifyCancel) {
+              shouldNotify = true;
+            } else if (updated.paymentStatus === 'paid' && original.paymentStatus !== 'paid' && storeConfig.telegram.notifyPayment) {
+              shouldNotify = true;
+            } else if (updated.status === 'completed' && original.status !== 'completed' && storeConfig.telegram.notifyPayment) {
+              shouldNotify = true;
+            }
+            
+            if (shouldNotify) {
+              const msg = formatOrderStatusChangeMessage(updated, original.status, original.paymentStatus, storeConfig.name);
+              sendTelegramMessage(storeConfig.telegram.botToken, storeConfig.telegram.chatId, msg);
+            }
+          }
+        }
+      }
+    }
     await syncWithFirestore('orders', updatedOrders, orders);
   };
 

@@ -94,6 +94,18 @@ export interface Staff {
   avatar: string;
 }
 
+export interface TelegramConfig {
+  enabled: boolean;
+  botToken: string;
+  chatId: string;
+  notifyNewOrder: boolean;
+  notifyPayment: boolean;
+  notifyCancel: boolean;
+  notifySummaryEnabled: boolean;
+  notifySummaryTime: string; // e.g., "22:00"
+  lastSummarySentDate?: string;
+}
+
 export interface StoreConfig {
   name: string;
   address: string;
@@ -110,6 +122,7 @@ export interface StoreConfig {
   adminPin?: string;
   staff?: Staff[];
   roles?: string[];
+  telegram?: TelegramConfig;
 }
 
 export interface Promotion {
