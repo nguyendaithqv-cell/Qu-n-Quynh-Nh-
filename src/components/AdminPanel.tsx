@@ -35,16 +35,18 @@ import {
   QrCode,
   Layout,
   Lock,
-  Bell
+  Bell,
+  Send
 } from 'lucide-react';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreConfig, Promotion, Customer, Table, Area } from '../types';
 import ReportSection from './ReportSection';
 import NotificationIcon from './NotificationIcon';
 import ActivityLogs from './ActivityLogs';
 import BackupRestore from './BackupRestore';
+import { sendTelegramMessage, formatDailySummaryMessage } from '../utils/telegram';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
-import { logAndNotify } from '../utils';
+import { logAndNotify, logAction } from '../utils';
 
 interface AdminPanelProps {
   products: Product[];
@@ -153,7 +155,7 @@ export default function AdminPanel({
   };
 
   // System Theme & Settings States
-  const [adminTheme, setAdminTheme] = useState<'standard' | 'vista' | 'cyberpunk' | 'win11'>(
+  const [adminTheme, setAdminTheme] = useState<'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026'>(
     () => storeConfig.theme || (localStorage.getItem('admin-panel-theme') as any) || 'standard'
   );
   const [audioEnabled, setAudioEnabled] = useState<boolean>(
@@ -177,7 +179,7 @@ export default function AdminPanel({
     }
   }, [storeConfig.theme]);
 
-  const handleThemeChange = async (newTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11') => {
+  const handleThemeChange = async (newTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026') => {
     setAdminTheme(newTheme);
     onUpdateStoreConfig({
       ...storeConfig,
@@ -287,6 +289,7 @@ export default function AdminPanel({
   const [showLogs, setShowLogs] = useState(false);
   const [selectedLogDate, setSelectedLogDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isTestingTele, setIsTestingTele] = useState(false);
 
   type TimeRange = 'all' | 'today' | 'yesterday' | 'week_this' | 'week_last' | 'month_this' | 'month_last' | 'year_this' | 'year_last';
   
@@ -4214,6 +4217,356 @@ export default function AdminPanel({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* ====== TELEGRAM NOTIFICATION INTEGRATION ====== */}
+          <div className="bg-slate-50 p-5 border border-slate-200 rounded-2xl space-y-4 shadow-sm text-xs">
+            <h3 className="font-extrabold text-[12px] text-slate-800 uppercase tracking-wide flex items-center gap-2">
+              <Send className="w-4 h-4 text-sky-500 animate-pulse" /> ✈️ TÍCH HỢP THÔNG BÁO TELEGRAM BOT
+            </h3>
+            
+            <p className="text-[10px] text-slate-500 font-sans leading-normal">
+              Bật tính năng này để nhận thông báo tức thời về điện thoại mỗi khi quán của bạn phát sinh đơn hàng mới, đặt bàn trước (booking), thanh toán thành công hoặc kết thúc ngày bán hàng với báo cáo doanh thu tổng hợp tiện lợi.
+            </p>
+
+            {/* Enable/Disable toggle */}
+            <div className="flex items-center justify-between bg-white px-4 py-3 border border-slate-150 rounded-xl">
+              <div>
+                <span className="block font-black text-slate-700 uppercase text-[10px]">Kích hoạt thông báo Telegram</span>
+                <span className="text-[9px] text-slate-400">Cho phép hệ thống gửi báo cáo trực tiếp đến nhóm chat Telegram của bạn</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editingConfig.telegram?.enabled || false}
+                  onChange={(e) => {
+                    const currentTele = editingConfig.telegram || {
+                      enabled: false,
+                      botToken: '',
+                      chatId: '',
+                      notifyNewOrder: true,
+                      notifyPayment: true,
+                      notifyCancel: true,
+                      notifySummaryEnabled: true,
+                      notifySummaryTime: '22:00'
+                    };
+                    setEditingConfig({
+                      ...editingConfig,
+                      telegram: {
+                        ...currentTele,
+                        enabled: e.target.checked
+                      }
+                    });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-505 peer-checked:bg-sky-550 peer-checked:bg-sky-500"></div>
+              </label>
+            </div>
+
+            {editingConfig.telegram?.enabled && (
+              <div className="space-y-4 pl-1 animate-fade-in">
+                
+                {/* 1. API Token and Chat ID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Telegram Bot Token*</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Sao chép từ @BotFather..."
+                      value={editingConfig.telegram?.botToken || ''}
+                      onChange={(e) => {
+                        const currentTele = editingConfig.telegram || {
+                          enabled: true,
+                          botToken: '',
+                          chatId: '',
+                          notifyNewOrder: true,
+                          notifyPayment: true,
+                          notifyCancel: true,
+                          notifySummaryEnabled: true,
+                          notifySummaryTime: '22:00'
+                        };
+                        setEditingConfig({
+                          ...editingConfig,
+                          telegram: { ...currentTele, botToken: e.target.value }
+                        });
+                      }}
+                      className="w-full bg-white border border-slate-250 rounded-xl px-3 py-2 font-mono text-[11px] text-slate-800 outline-none focus:border-sky-400 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Telegram Chat ID*</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Dán ID từ nhóm chat, bắt đầu với dấu âm (-) như -100xxxxx"
+                      value={editingConfig.telegram?.chatId || ''}
+                      onChange={(e) => {
+                        const currentTele = editingConfig.telegram || {
+                          enabled: true,
+                          botToken: '',
+                          chatId: '',
+                          notifyNewOrder: true,
+                          notifyPayment: true,
+                          notifyCancel: true,
+                          notifySummaryEnabled: true,
+                          notifySummaryTime: '22:00'
+                        };
+                        setEditingConfig({
+                          ...editingConfig,
+                          telegram: { ...currentTele, chatId: e.target.value }
+                        });
+                      }}
+                      className="w-full bg-white border border-slate-250 rounded-xl px-3 py-2 font-mono text-[11px] text-slate-800 outline-none focus:border-sky-400 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Test button row */}
+                <div className="flex items-center gap-3 bg-white p-3 border border-slate-150 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const token = editingConfig.telegram?.botToken;
+                      const chat = editingConfig.telegram?.chatId;
+                      if (!token || !chat) {
+                        alert('Vui lòng nhập đầy đủ Bot Token và Chat ID trước khi bấm gửi thử nghiệm!');
+                        return;
+                      }
+                      
+                      setIsTestingTele(true);
+                      try {
+                        const testMsg = `<b>⚡️ KHAI VỊ POS - KIỂM TRA ĐƯỜNG TRUYỀN</b>\n----------------------------------------\n🎉 Xin chúc mừng! Thiết bị quản lý đã kết nối thành công tới POS thông báo tự động của cửa hàng <b>${editingConfig.name || storeConfig.name}</b>.\n⏰ Thời gian kiểm thử: ${new Date().toLocaleTimeString('vi-VN')} ${new Date().toLocaleDateString('vi-VN')}`;
+                        const success = await sendTelegramMessage(token, chat, testMsg);
+                        if (success) {
+                          alert('🔥 Gửi tin nhắn thử nghiệm THÀNH CÔNG! Hãy kiểm tra ứng dụng Telegram của nhóm bạn.');
+                        } else {
+                          alert('❌ Gửi tin nhắn thất bại! Vui lòng kiểm tra lại Bot Token đã chính xác chưa, hoặc bạn đã khởi động bằng cách gõ /start với bot chưa.');
+                        }
+                      } catch (e) {
+                        alert('Xảy ra lỗi mạng khi gửi tin thử nghiệm.');
+                      } finally {
+                        setIsTestingTele(false);
+                      }
+                    }}
+                    disabled={isTestingTele}
+                    className="px-4.5 py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white font-black rounded-lg text-[10px] flex items-center gap-1.5 transition-colors uppercase cursor-pointer shrink-0 shadow-sm"
+                  >
+                    <Send className="w-3.5 h-3.5" /> {isTestingTele ? 'Đang gửi...' : 'GỬI TIN CHẠY THỬ'}
+                  </button>
+                  <p className="text-[9px] text-slate-400 italic leading-snug">
+                    Hãy khởi động Bot bằng cách chat <code>/start</code> với Bot cá nhân hoặc thêm Bot vào Nhóm làm Quản Trị Viên (Admin) trước khi test.
+                  </p>
+                </div>
+
+                {/* 2. Notification criteria checklists */}
+                <div className="bg-white p-4 border border-slate-150 rounded-xl space-y-3">
+                  <span className="block font-black text-slate-650 uppercase text-[9.5px] border-b border-slate-100 pb-1.5 text-slate-600">
+                    🔔 Cài đặt loại hành vi gửi thông báo tự động:
+                  </span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label className="flex items-start gap-2.5 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors border border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={editingConfig.telegram?.notifyNewOrder ?? true}
+                        onChange={(e) => {
+                          const currentTele = editingConfig.telegram || {
+                            enabled: true,
+                            botToken: '',
+                            chatId: '',
+                            notifyNewOrder: true,
+                            notifyPayment: true,
+                            notifyCancel: true,
+                            notifySummaryEnabled: true,
+                            notifySummaryTime: '22:00'
+                          };
+                          setEditingConfig({
+                            ...editingConfig,
+                            telegram: { ...currentTele, notifyNewOrder: e.target.checked }
+                          });
+                        }}
+                        className="rounded border-slate-300 text-sky-500 focus:ring-sky-500 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="block font-bold text-slate-700 text-[10px]">Đơn hàng / Cọc mới</span>
+                        <span className="text-[8.5px] text-slate-400">Có đơn gọi món hoặc cọc booking</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors border border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={editingConfig.telegram?.notifyPayment ?? true}
+                        onChange={(e) => {
+                          const currentTele = editingConfig.telegram || {
+                            enabled: true,
+                            botToken: '',
+                            chatId: '',
+                            notifyNewOrder: true,
+                            notifyPayment: true,
+                            notifyCancel: true,
+                            notifySummaryEnabled: true,
+                            notifySummaryTime: '22:00'
+                          };
+                          setEditingConfig({
+                            ...editingConfig,
+                            telegram: { ...currentTele, notifyPayment: e.target.checked }
+                          });
+                        }}
+                        className="rounded border-slate-300 text-sky-500 focus:ring-sky-500 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="block font-bold text-slate-700 text-[10px]">Thanh toán đơn hàng</span>
+                        <span className="text-[8.5px] text-slate-400">Khi thu ngân thu tiền hoặc ăn xong</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors border border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={editingConfig.telegram?.notifyCancel ?? true}
+                        onChange={(e) => {
+                          const currentTele = editingConfig.telegram || {
+                            enabled: true,
+                            botToken: '',
+                            chatId: '',
+                            notifyNewOrder: true,
+                            notifyPayment: true,
+                            notifyCancel: true,
+                            notifySummaryEnabled: true,
+                            notifySummaryTime: '22:00'
+                          };
+                          setEditingConfig({
+                            ...editingConfig,
+                            telegram: { ...currentTele, notifyCancel: e.target.checked }
+                          });
+                        }}
+                        className="rounded border-slate-300 text-sky-500 focus:ring-sky-500 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="block font-bold text-slate-700 text-[10px]">Hủy đơn hàng</span>
+                        <span className="text-[8.5px] text-slate-400">Khi hoàn tiền/hủy bàn đặt trước</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 3. Daily Summary automation */}
+                <div className="bg-sky-50/50 p-4 border border-sky-100 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-sky-100/50 pb-2">
+                    <span className="font-extrabold text-slate-700 uppercase text-[9.5px] flex items-center gap-1">
+                      📊 Báo cáo tự động tổng hợp cuối ngày:
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingConfig.telegram?.notifySummaryEnabled ?? true}
+                        onChange={(e) => {
+                          const currentTele = editingConfig.telegram || {
+                            enabled: true,
+                            botToken: '',
+                            chatId: '',
+                            notifyNewOrder: true,
+                            notifyPayment: true,
+                            notifyCancel: true,
+                            notifySummaryEnabled: true,
+                            notifySummaryTime: '22:00'
+                          };
+                          setEditingConfig({
+                            ...editingConfig,
+                            telegram: { ...currentTele, notifySummaryEnabled: e.target.checked }
+                          });
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                    </label>
+                  </div>
+
+                  {editingConfig.telegram?.notifySummaryEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                      <div>
+                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Thời gian tự động gửi đi hàng ngày*</label>
+                        <input
+                          type="time"
+                          required
+                          value={editingConfig.telegram?.notifySummaryTime || '22:00'}
+                          onChange={(e) => {
+                            const currentTele = editingConfig.telegram || {
+                              enabled: true,
+                              botToken: '',
+                              chatId: '',
+                              notifyNewOrder: true,
+                              notifyPayment: true,
+                              notifyCancel: true,
+                              notifySummaryEnabled: true,
+                              notifySummaryTime: '22:00'
+                            };
+                            setEditingConfig({
+                              ...editingConfig,
+                              telegram: { ...currentTele, notifySummaryTime: e.target.value }
+                            });
+                          }}
+                          className="w-full max-w-[120px] bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-black text-slate-800 outline-none text-[11px]"
+                        />
+                        <p className="text-[8.5px] text-slate-400 mt-1 leading-normal">
+                          Tổng hợp doanh thu ngày hôm nay và tự động gửi đúng vào hẹn giờ khi chạy POS.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-1 items-start md:items-end justify-center h-full">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const token = editingConfig.telegram?.botToken;
+                            const chat = editingConfig.telegram?.chatId;
+                            if (!token || !chat) {
+                              alert('Vui lòng điền Bot Token và Chat ID trước!');
+                              return;
+                            }
+                            
+                            setIsTestingTele(true);
+                            try {
+                              const todayStr = new Date().toISOString().split('T')[0];
+                              const summaryMsg = formatDailySummaryMessage(orders, todayStr, editingConfig.name || storeConfig.name);
+                              const success = await sendTelegramMessage(token, chat, summaryMsg);
+                              if (success) {
+                                alert('🎉 Đã lập tức gửi báo cáo tổng hợp doanh thu ngày hôm nay thành công!');
+                              } else {
+                                alert('❌ Gửi báo cáo thất bại! Xin kiểm tra cấu hình mạng hoặc Telegram log.');
+                              }
+                            } catch (e) {
+                              alert('Lỗi khi gửi báo cáo tổng hợp.');
+                            } finally {
+                              setIsTestingTele(false);
+                            }
+                          }}
+                          disabled={isTestingTele}
+                          className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-extrabold rounded-xl text-[9px] flex items-center gap-1 shadow-sm transition-colors uppercase cursor-pointer"
+                        >
+                          📌 BÁO CÁO DOANH THU NGAY LẬP TỨC
+                        </button>
+                        <span className="text-[8.5px] text-slate-500 mt-1 font-semibold leading-relaxed">
+                          Bấm để tổng hợp và gửi báo cáo kết quả doanh tức thời của ngày hôm nay
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick documentation box */}
+                <div className="bg-slate-200/50 p-3 rounded-xl text-[9px] text-slate-500 leading-relaxed font-sans space-y-1 border border-slate-200">
+                  <span className="block font-black text-slate-700 uppercase tracking-widest text-[8.5px] mb-1">🇻🇳 Hướng dẫn lấy Token / ChatID:</span>
+                  <p>• <b>Bước 1:</b> Tìm <b>@BotFather</b> trên Telegram và gửi <code>/newbot</code> để lấy Token.</p>
+                  <p>• <b>Bước 2:</b> Thêm Bot của bạn vào nhóm chat và cấp quyền Admin của nhóm.</p>
+                  <p>• <b>Bước 3:</b> Thêm <b>@raw_data_bot</b> vào nhóm hoặc chat cá nhân để xem mã <code>id</code> nhóm (là số âm, có dấu trừ) dán vào ô Chat ID.</p>
+                </div>
+
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-3 border-t border-slate-100">
