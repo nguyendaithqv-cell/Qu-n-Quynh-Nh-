@@ -436,17 +436,41 @@ export default function App() {
 
   // Automated background scheduler for Telegram daily sumaries
   useEffect(() => {
+    if (isLoading) return;
+
     if (storeConfig.telegram?.enabled && storeConfig.telegram?.notifySummaryEnabled) {
       const intervalId = setInterval(() => {
         checkAndSendAutoSummary(orders, storeConfig, handleUpdateStoreConfig);
       }, 30000); // Check every 30 seconds
       
-      // Run once immediately on mount or config activation
+      // Run once immediately on config activation
       checkAndSendAutoSummary(orders, storeConfig, handleUpdateStoreConfig);
       
       return () => clearInterval(intervalId);
     }
-  }, [orders, storeConfig]);
+  }, [isLoading, orders, storeConfig]);
+
+  // Clean and monitor promotion limits automatically in the background
+  useEffect(() => {
+    if (!promotions || promotions.length === 0 || !orders || orders.length === 0) return;
+
+    let changed = false;
+    const updatedPromotions = promotions.map(promo => {
+      if (promo.isActive && promo.maxUsageCount && promo.maxUsageCount > 0) {
+        // Count valid, non-cancelled orders that used this promotion
+        const useCount = orders.filter(o => o.promoCodeUsed === promo.code && o.status !== 'cancelled').length;
+        if (useCount >= promo.maxUsageCount) {
+          changed = true;
+          return { ...promo, isActive: false };
+        }
+      }
+      return promo;
+    });
+
+    if (changed) {
+      handleUpdatePromotions(updatedPromotions);
+    }
+  }, [orders, promotions]);
 
   // Unified dynamic sync helper for modifying collections based on arrays of data
   const syncWithFirestore = async <T extends { id: string }>(
