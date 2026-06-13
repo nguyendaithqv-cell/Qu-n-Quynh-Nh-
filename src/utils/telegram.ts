@@ -40,7 +40,7 @@ export async function sendTelegramMessage(botToken: string, chatId: string, text
 /**
  * Format a Vietnamese friendly message for a new order.
  */
-export function formatNewOrderMessage(order: Order, storeName: string): string {
+export function formatNewOrderMessage(order: Order, storeName: string, isExtraOrder?: boolean): string {
   const isBooking = order.tableId === 'BOOKING';
   const tablePart = isBooking 
     ? `🗓 <b>ĐẶT BÀN TRƯỚC (BOOKING)</b>` 
@@ -52,7 +52,11 @@ export function formatNewOrderMessage(order: Order, storeName: string): string {
     .map((item, i) => `  ${i + 1}. <b>${item.productName}</b> × ${item.quantity} (${item.priceOnOrder.toLocaleString('vi-VN')}đ)`)
     .join('\n');
 
-  let text = `<b>🔔 CÓ ĐƠN HÀNG MỚI từ ${storeName || 'Hệ Thống'}!</b>\n`;
+  let title = isExtraOrder 
+    ? `<b>🔔 KHÁCH GỌI THÊM MÓN từ ${storeName || 'Hệ Thống'}!</b>`
+    : `<b>🔔 CÓ ĐƠN HÀNG MỚI từ ${storeName || 'Hệ Thống'}!</b>`;
+
+  let text = `${title}\n`;
   text += `----------------------------------------\n`;
   text += `📍 <b>Vị trí / Loại hình:</b> ${tablePart}\n`;
   text += `🧾 <b>Mã Bill:</b> <code>${order.billCode}</code>\n`;
