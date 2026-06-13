@@ -491,7 +491,13 @@ export default function App() {
 
       // 3. Trigger Telegram Notification
       if (storeConfig.telegram?.enabled && storeConfig.telegram?.notifyNewOrder && storeConfig.telegram.botToken && storeConfig.telegram.chatId) {
-        const msg = formatNewOrderMessage(newOrder, storeConfig.name);
+        const isExtraOrder = !!(newOrder.tableId && newOrder.tableId !== 'BOOKING' && orders.some(o => 
+          o.tableId === newOrder.tableId && 
+          o.id !== newOrder.id && 
+          o.status !== 'completed' && 
+          o.status !== 'cancelled'
+        ));
+        const msg = formatNewOrderMessage(newOrder, storeConfig.name, isExtraOrder);
         sendTelegramMessage(storeConfig.telegram.botToken, storeConfig.telegram.chatId, msg);
       }
     } catch (e) {
