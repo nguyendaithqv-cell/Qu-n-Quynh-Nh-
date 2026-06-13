@@ -674,6 +674,14 @@ export default function MobileSimulator({
       return;
     }
 
+    if (promo.maxUsageCount && promo.maxUsageCount > 0) {
+      const currentUsageCount = (orders || []).filter(o => o.promoCodeUsed === promo.code && o.status !== 'cancelled').length;
+      if (currentUsageCount >= promo.maxUsageCount) {
+        setPromoError('Mã giảm giá này đã vượt quá giới hạn số lượt sử dụng.');
+        return;
+      }
+    }
+
     const sub = getSubtotal();
     if (sub < promo.minOrderValue) {
       setPromoError(`Mã này chỉ áp dụng cho đơn hàng từ ${promo.minOrderValue.toLocaleString('vi-VN')}đ.`);

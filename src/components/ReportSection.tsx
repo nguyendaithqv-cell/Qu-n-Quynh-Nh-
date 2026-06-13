@@ -137,7 +137,23 @@ export default function ReportSection({ products, orders, categories, storeConfi
       grand: { revenue:0, cost:0, profit:0, qty:0 }
     });
 
-    return { salesArray, totals };
+    // Calculate cash, banking and discount totals for completed orders
+    let cashRevenue = 0;
+    let bankingRevenue = 0;
+    let totalDiscount = 0;
+
+    orders
+      .filter(o => o.status === 'completed' && isOrderInTimeRange(o.createdAt))
+      .forEach(o => {
+        totalDiscount += o.discountAmount || 0;
+        if (o.paymentMethod === 'banking') {
+          bankingRevenue += o.totalAmount;
+        } else {
+          cashRevenue += o.totalAmount;
+        }
+      });
+
+    return { salesArray, totals, cashRevenue, bankingRevenue, totalDiscount };
   }, [orders, products, categories, timeRange, startDate, endDate]);
 
   // Handle head click for sorting
@@ -207,7 +223,17 @@ export default function ReportSection({ products, orders, categories, storeConfi
     wsData.push(["TỔNG CỘNG", fTotal.qty + dTotal.qty, fTotal.revenue + dTotal.revenue, fTotal.cost + dTotal.cost, fTotal.profit + dTotal.profit]);
     wsData.push([]); 
 
-    wsData.push(["II. CHI TIẾT SẢN PHẨM"]);
+    wsData.push(["II. THỐNG KÊ CHI TIẾT TÀI CHÍNH & KHUYẾN MÃI"]);
+    wsData.push(["Chỉ Tiêu Tài Chính / Phương Thức Thanh Toán", "Giá Trị (đ)"]);
+    wsData.push(["Tổng Doanh Thu Tạm Tính (Trước giảm giá)", reportData.totals.grand.revenue]);
+    wsData.push(["Tổng Tiền Khuyến Mãi Đã Chiết Khấu (-)", reportData.totalDiscount]);
+    wsData.push(["Tổng Doanh Thu Thực Tế (Sau giảm giá)", reportData.cashRevenue + reportData.bankingRevenue]);
+    wsData.push(["  + Doanh Thu Nhận Tiền Mặt (COD)", reportData.cashRevenue]);
+    wsData.push(["  + Doanh Thu Nhận Chuyển Khoản (Banking)", reportData.bankingRevenue]);
+    wsData.push(["Tổng Lợi Nhuận Kinh Doanh Thực Tế", reportData.totals.grand.profit]);
+    wsData.push([]);
+
+    wsData.push(["III. CHI TIẾT SẢN PHẨM"]);
     wsData.push(["STT", "Tên Sản Phẩm", "Danh Mục", "SL Bán", "Doanh Thu (đ)", "Chi Phí (đ)", "Lợi Nhuận (đ)"]);
 
     reportData.salesArray.forEach((s, index) => {
@@ -346,7 +372,7 @@ export default function ReportSection({ products, orders, categories, storeConfi
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white/60 p-4 rounded-xl border border-sky-100 shadow-sm">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Tổng Doanh Thu</p>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Tổng Doanh Thu (Tạm tính)</p>
               <div className="font-mono font-black text-slate-900 text-lg xs:text-2xl flex items-baseline gap-1 flex-wrap">
                 <span>{reportData.totals.grand.revenue.toLocaleString('vi-VN')}</span>
                 <span className="text-xs font-bold text-slate-400">đ</span>
@@ -358,6 +384,39 @@ export default function ReportSection({ products, orders, categories, storeConfi
                 <span>{reportData.totals.grand.profit.toLocaleString('vi-VN')}</span>
                 <span className="text-xs font-bold text-emerald-200">đ</span>
               </div>
+            </div>
+          </div>
+
+          {/* FINANCIAL BREAKDOWN & DISCOUNTS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-sky-200/50">
+            <div className="bg-white/70 p-3 rounded-xl border border-sky-100/80 flex items-center justify-between shadow-xs">
+              <div>
+                <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest">💵 TIỀN MẶT COD</p>
+                <div className="font-mono font-black text-slate-800 text-xs xs:text-sm mt-0.5">
+                  {reportData.cashRevenue.toLocaleString('vi-VN')} <span className="text-[9px] text-slate-400 font-bold">đ</span>
+                </div>
+              </div>
+              <span className="text-lg select-none">💵</span>
+            </div>
+
+            <div className="bg-white/70 p-3 rounded-xl border border-sky-100/80 flex items-center justify-between shadow-xs">
+              <div>
+                <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest">🏦 CHUYỂN KHOẢN</p>
+                <div className="font-mono font-black text-slate-800 text-xs xs:text-sm mt-0.5">
+                  {reportData.bankingRevenue.toLocaleString('vi-VN')} <span className="text-[9px] text-slate-400 font-bold">đ</span>
+                </div>
+              </div>
+              <span className="text-lg select-none">💳</span>
+            </div>
+
+            <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-100/80 flex items-center justify-between shadow-xs">
+              <div>
+                <p className="text-[9px] text-rose-600 font-extrabold uppercase tracking-widest">🎁 TIỀN KHUYẾN MÃI</p>
+                <div className="font-mono font-black text-rose-700 text-xs xs:text-sm mt-0.5">
+                  {reportData.totalDiscount.toLocaleString('vi-VN')} <span className="text-[9px] text-rose-450 font-bold">đ</span>
+                </div>
+              </div>
+              <span className="text-lg select-none">🎁</span>
             </div>
           </div>
         </div>

@@ -514,8 +514,17 @@ export default function CashierPOS({
   // Helper calculation for promotions & payment
   const activePromoObject = useMemo(() => {
     if (!selectedPromoCode) return null;
-    return promotions.find(p => p.code.toLowerCase() === selectedPromoCode.toLowerCase() && p.isActive);
-  }, [selectedPromoCode, promotions]);
+    const promo = promotions.find(p => p.code.toLowerCase() === selectedPromoCode.toLowerCase() && p.isActive);
+    if (!promo) return null;
+
+    if (promo.maxUsageCount && promo.maxUsageCount > 0) {
+      const curCount = orders.filter(o => o.promoCodeUsed === promo.code && o.status !== 'cancelled').length;
+      if (curCount >= promo.maxUsageCount) {
+        return null; // promo usage count exceeded
+      }
+    }
+    return promo;
+  }, [selectedPromoCode, promotions, orders]);
 
   const rawSubTotal = currentActiveOrder?.subTotal || 0;
 
@@ -1731,7 +1740,14 @@ export default function CashierPOS({
                     className={`w-full rounded-xl p-2 outline-none font-bold border ${cm.inputBg} ${cm.borderClass}`}
                   >
                     <option value="" className="text-slate-800">-- Không áp dụng --</option>
-                    {promotions.filter(p => p.isActive && rawSubTotal >= p.minOrderValue).map(p => (
+                    {promotions.filter(p => {
+                      if (!p.isActive || rawSubTotal < p.minOrderValue) return false;
+                      if (p.maxUsageCount && p.maxUsageCount > 0) {
+                        const curCount = orders.filter(o => o.promoCodeUsed === p.code && o.status !== 'cancelled').length;
+                        if (curCount >= p.maxUsageCount) return false;
+                      }
+                      return true;
+                    }).map(p => (
                       <option key={p.id} value={p.code} className="text-slate-800">
                         {p.code} (Giảm {p.value.toLocaleString('vi-VN')}{p.type === 'percentage' ? '%' : 'đ'})
                       </option>
