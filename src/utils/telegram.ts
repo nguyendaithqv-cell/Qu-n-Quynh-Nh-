@@ -141,12 +141,24 @@ export function formatOrderStatusChangeMessage(order: Order, prevStatus: string,
   return text;
 }
 
+// Module-level lock to prevent concurrent daily summary sending in the same session
+let lastSentSummaryLock: string | null = null;
+
 /**
  * Format a Daily Summary message.
  */
 export function formatDailySummaryMessage(orders: Order[], dateStr: string, storeName: string): string {
-  // Filter orders for the selected date
-  const dayOrders = orders.filter(o => o.createdAt.startsWith(dateStr));
+  // Parse target dateStr (e.g. "2026-06-13") into local date bounds matching report section
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+  // Filter orders for the selected date using local bounds
+  const dayOrders = orders.filter(o => {
+    if (!o.createdAt) return false;
+    const d = new Date(o.createdAt);
+    return d >= startOfDay && d <= endOfDay;
+  });
   
   const completedOrders = dayOrders.filter(o => o.status === 'completed');
   const paidOrders = dayOrders.filter(o => o.paymentStatus === 'paid');
@@ -255,7 +267,7 @@ export async function checkAndSendAutoSummary(
   const dateStr = `${localYear}-${localMonth}-${localDay}`;
 
   // If already sent today, skip
-  if (tele.lastSummarySentDate === dateStr) {
+  if (tele.lastSummarySentDate === dateStr || lastSentSummaryLock === dateStr) {
     return false;
   }
 
@@ -268,13 +280,15 @@ export async function checkAndSendAutoSummary(
 
   // If current local time is past or equal to the scheduled time, trigger summary!
   if (currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute)) {
+    // Acquire the memory lock immediately to prevent duplicate requests while API call is resolving or Firestore is saving
+    lastSentSummaryLock = dateStr;
     const summaryText = formatDailySummaryMessage(orders, dateStr, storeConfig.name);
     
     console.log(`[Telegram Auto-Summary] Scheduled time reached (${targetTime}). Sending summary for ${dateStr}...`);
     const success = await sendTelegramMessage(tele.botToken, tele.chatId, summaryText);
     
     if (success) {
-      // Mark as sent for today to prevent continuous trigger
+      // Mark as sent for today in database to persist across browser restarts
       const updatedConfig: StoreConfig = {
         ...storeConfig,
         telegram: {
@@ -284,6 +298,9 @@ export async function checkAndSendAutoSummary(
       };
       await onUpdateStoreConfig(updatedConfig);
       return true;
+    } else {
+      // Release lock on error so it can retry later
+      lastSentSummaryLock = null;
     }
   }
 
