@@ -61,7 +61,8 @@
         "openHours": { "type": "string" },
         "customQrCodeUrl": { "type": "string" },
         "logoUrl": { "type": "string" },
-        "theme": { "type": "string", "enum": ["standard", "vista", "cyberpunk", "win11"] }
+        "theme": { "type": "string", "enum": ["standard", "vista", "cyberpunk", "win11"] },
+        "telegram": { "type": "object" }
       },
       "required": ["name", "address", "phone", "zaloHotline", "bankName", "bankAccount", "bankAccountName", "openHours"]
     },
