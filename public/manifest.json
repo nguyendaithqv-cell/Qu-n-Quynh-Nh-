@@ -1,0 +1,21 @@
+{
+  "name": "Khai Vị POS",
+  "short_name": "Khai Vị POS",
+  "description": "Hệ thống quản lý bán hàng & POS thông minh chuyên nghiệp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#ea580c",
+  "icons": [
+    {
+      "src": "/icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    }
+  ]
+}
