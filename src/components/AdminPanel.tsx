@@ -718,8 +718,8 @@ export default function AdminPanel({
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws) as any[];
 
-      const updatedCategories = [...categories];
-      const updatedProducts = [...products];
+      const updatedCategories = categories.map(c => ({ ...c }));
+      const updatedProducts = products.map(p => ({ ...p }));
 
       data.forEach((row) => {
         const catName = row['Tên Danh Mục'] || row['Danh mục'] || 'Chưa phân loại';
