@@ -10,7 +10,8 @@ import {
   StoreConfig, 
   Promotion,
   Table,
-  Area
+  Area,
+  Staff
 } from './types';
 import MobileSimulator from './components/MobileSimulator';
 import AdminPanel from './components/AdminPanel';
@@ -28,7 +29,20 @@ import {
   Utensils,
   LogOut,
   Calculator,
-  LayoutGrid
+  LayoutGrid,
+  Grid,
+  BarChart,
+  History,
+  ShoppingBag,
+  FileText,
+  Users,
+  Lock,
+  User,
+  Plus,
+  Download,
+  ExternalLink,
+  Share2,
+  MoreVertical
 } from 'lucide-react';
 import CashierPOS from './components/CashierPOS';
 import { 
@@ -71,52 +85,29 @@ export default function App() {
   // On mobile devices, we switch view mode: 'client' (the customer ordering app), 'history' (their personal orders history), or 'admin' (the dashboard)
   const [mobileMode, setMobileMode] = useState<'client' | 'history' | 'contact' | 'admin'>('client');
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
+  const isAdminAuthenticated = !!authenticatedStaff;
   const [adminViewMode, setAdminViewMode] = useState<'picker' | 'admin' | 'cashier'>('picker');
+
+  // A2HS (Add to Home screen) PWA states
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallGuide, setShowInstallGuide] = useState<boolean>(false);
 
   // Lightweight style presets passed down to isolated Cashier POS component
   const appThemeStyles = {
-    standard: {
-      tabActive: 'bg-orange-600 text-white shadow-sm',
-      tabInactive: 'text-slate-600 hover:bg-slate-100/50',
-      tabContainer: 'flex border-b border-slate-200 mb-6 bg-white rounded-xl p-1 shadow-xs font-semibold text-xs overflow-x-auto no-scrollbar',
-    },
-    vista: {
-      tabActive: 'bg-gradient-to-b from-sky-400 via-sky-600 to-sky-700 text-white shadow-[0_2px_8px_rgba(3,105,161,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] border border-sky-650 relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-[50%] before:bg-white/35',
-      tabInactive: 'bg-gradient-to-b from-white to-slate-100/85 hover:from-white hover:to-slate-50 text-slate-650 hover:text-slate-850 border border-slate-200/80 hover:border-slate-300 shadow-xs active:bg-slate-200',
-      tabContainer: 'flex border-b border-white/40 mb-6 bg-white/45 backdrop-blur-md border border-white/40 p-1 rounded-xl shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] font-semibold text-xs overflow-x-auto no-scrollbar',
-    },
     cyberpunk: {
       tabActive: 'bg-[#66fcf1] text-[#0b0c10] font-black border border-[#66fcf1] shadow-[0_0_10px_rgba(102,252,241,0.35)]',
       tabInactive: 'bg-[#12161f] hover:bg-[#1a1f26] text-[#c5c6c7]/80 hover:text-white border border-[#2c3540] hover:border-[#66fcf1]/30 active:text-cyan-400',
       tabContainer: 'flex border-[#2c3540] mb-6 bg-[#12161f] p-1 rounded-xl font-semibold text-xs overflow-x-auto no-scrollbar',
     },
-    win11: {
-      tabActive: 'bg-white border-b-2 border-[#0078d4] text-[#0078d4] font-bold shadow-xs',
-      tabInactive: 'text-zinc-650 hover:text-zinc-900 hover:bg-[#eaeaea]/60 rounded-md',
-      tabContainer: 'flex gap-1 border-b border-zinc-200 mb-6 bg-[#f3f3f3] p-1.5 rounded-xl font-semibold text-xs overflow-x-auto no-scrollbar',
+    dai: {
+      tabActive: 'bg-[#7052ff] text-white shadow-md shadow-[#7052ff]/20 rounded-xl',
+      tabInactive: 'text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl',
+      tabContainer: 'flex gap-2 mb-6 bg-white p-2 rounded-2xl font-semibold text-xs shadow-sm overflow-x-auto no-scrollbar',
     }
   };
 
   const cashierHeaderStyles = {
-    standard: {
-      outerBg: 'bg-slate-50',
-      headerBg: 'bg-[#12161f] border-b border-[#2c3540]/65 text-white',
-      logoBg: 'bg-orange-600 text-white shadow-sm',
-      subText: 'text-[#aae0fa]/55 font-bold',
-      titleText: 'text-white',
-      btnBack: 'bg-slate-800 hover:bg-slate-755 hover:text-orange-400 text-slate-300 border border-slate-705/80',
-      btnLock: 'bg-rose-955/40 hover:bg-rose-950 text-rose-400 border border-rose-900/50'
-    },
-    vista: {
-      outerBg: 'bg-gradient-to-br from-sky-100/20 via-slate-100 to-emerald-100/20',
-      headerBg: 'bg-white/45 backdrop-blur-md border-b border-white/50 text-slate-900 shadow-sm',
-      logoBg: 'bg-gradient-to-b from-sky-400 via-sky-600 to-sky-700 text-white',
-      subText: 'text-sky-600/80 font-bold',
-      titleText: 'text-slate-950 font-black drop-shadow-[0_0.5px_0_rgba(255,255,255,0.8)]',
-      btnBack: 'bg-white/60 hover:bg-white/95 text-sky-700 border border-white/65 hover:border-sky-500/30',
-      btnLock: 'bg-rose-50/70 hover:bg-rose-100/80 text-rose-600 border border-rose-200'
-    },
     cyberpunk: {
       outerBg: 'bg-[#0b0c10]',
       headerBg: 'bg-[#121420]/95 border-b border-[#45f3ff]/20 text-[#c5c6c7] shadow-[0_4px_12px_rgba(0,0,0,0.45)]',
@@ -126,18 +117,18 @@ export default function App() {
       btnBack: 'bg-[#1f2833] hover:bg-[#1f2833]/80 text-[#66fcf1] border border-[#45f3ff]/30 hover:border-[#66fcf1]',
       btnLock: 'bg-[#2a0c12] hover:bg-rose-950 text-rose-500 border border-rose-900/40 font-mono'
     },
-    win11: {
-      outerBg: 'bg-[#f3f3f3]',
-      headerBg: 'bg-[#f9f9f9]/95 backdrop-blur-md border-b border-zinc-200 text-zinc-800 shadow-xs',
-      logoBg: 'bg-[#0078d4] text-white',
-      subText: 'text-zinc-500 font-bold',
-      titleText: 'text-zinc-900 font-extrabold',
-      btnBack: 'bg-white hover:bg-zinc-100/80 text-zinc-700 border border-zinc-250',
-      btnLock: 'bg-zinc-100 hover:bg-zinc-200/50 text-rose-650 border border-zinc-200'
+    dai: {
+      outerBg: 'bg-[#f8f9fe]',
+      headerBg: 'bg-[#f8f9fe] border-b-0 text-slate-800 pt-6 px-8',
+      logoBg: 'bg-gradient-to-br from-[#7052ff] to-[#5136e0] text-white shadow-lg shadow-indigo-500/30 rounded-2xl',
+      subText: 'text-slate-400 font-bold text-[10px]',
+      titleText: 'text-[#2e335b] font-black',
+      btnBack: 'bg-white hover:bg-indigo-50 text-[#7052ff] border border-indigo-100 px-4 py-2 rounded-xl shadow-sm font-semibold transition-all',
+      btnLock: 'bg-rose-50 hover:bg-rose-100 text-rose-500 border border-rose-100 px-4 py-2 rounded-xl font-semibold transition-all'
     }
   };
 
-  const adminTheme = storeConfig.theme || 'standard';
+  const adminTheme = storeConfig.theme || 'dai';
 
   // Helper to extract initials and dynamic subtitle for branding
   const getStoreLogoInfo = () => {
@@ -202,6 +193,17 @@ export default function App() {
     checkViewport();
     window.addEventListener('resize', checkViewport);
     return () => window.removeEventListener('resize', checkViewport);
+  }, []);
+
+  // Listen for beforeinstallprompt event to enable direct PWA shortcut trigger
+  useEffect(() => {
+    const handleBeforePrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('PWA installation event captured successfully');
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforePrompt);
   }, []);
 
   // Sync to localStorage on every state modification as a fast-load local mirror
@@ -503,6 +505,11 @@ export default function App() {
 
   // Actions triggerable by Mobile app and Admin app, synced immediately to Firebase
   const handleAddOrder = async (newOrder: Order) => {
+    // Determine the creator if not explicitly set
+    if (!newOrder.createdBy) {
+      newOrder.createdBy = authenticatedStaff ? authenticatedStaff.fullName : 'Khách';
+    }
+
     // 1. Local optimistic update to show instantly in local UI tabs
     setOrders(prev => {
       if (prev.some(o => o.id === newOrder.id)) return prev;
@@ -532,9 +539,21 @@ export default function App() {
   };
 
   const handleUpdateOrders = async (updatedOrders: Order[]) => {
+    // Automatically set paidBy when order paymentStatus transitions to 'paid'
+    const modifiedOrders = updatedOrders.map(updated => {
+      const original = orders.find(o => o.id === updated.id);
+      if (original && updated.paymentStatus === 'paid' && original.paymentStatus !== 'paid' && !updated.paidBy) {
+        return {
+          ...updated,
+          paidBy: authenticatedStaff ? authenticatedStaff.fullName : 'Khách'
+        };
+      }
+      return updated;
+    });
+
     // Check transitions before syncing for Telegram notifications
     if (storeConfig.telegram?.enabled && storeConfig.telegram.botToken && storeConfig.telegram.chatId) {
-      for (const updated of updatedOrders) {
+      for (const updated of modifiedOrders) {
         const original = orders.find(o => o.id === updated.id);
         if (original) {
           const statusChanged = original.status !== updated.status;
@@ -559,7 +578,7 @@ export default function App() {
         }
       }
     }
-    await syncWithFirestore('orders', updatedOrders, orders);
+    await syncWithFirestore('orders', modifiedOrders, orders);
   };
 
   const handleUpdateProducts = async (updatedProducts: Product[]) => {
@@ -590,7 +609,27 @@ export default function App() {
     }
   };
 
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User installation decision: ${outcome}`);
+        setDeferredPrompt(null);
+      } catch (err) {
+        console.error('Error triggering PWA install dialog:', err);
+        setShowInstallGuide(true);
+      }
+    } else {
+      setShowInstallGuide(true);
+    }
+  };
+
   const renderModulePicker = () => {
+    const isManagerOrAdmin = authenticatedStaff?.role?.toLowerCase().includes('quản lý') || 
+                             authenticatedStaff?.role?.toLowerCase().includes('admin') || 
+                             authenticatedStaff?.role?.toLowerCase().includes('chủ');
+
     return (
       <div className="w-full h-full min-h-screen bg-slate-900 flex items-center justify-center p-4 sm:p-8 font-sans text-white animate-fade-in z-50">
         <div className="w-full max-w-4xl bg-slate-800/80 backdrop-blur-md rounded-3xl p-6 sm:p-10 border border-slate-700/50 shadow-2xl flex flex-col items-center">
@@ -647,8 +686,12 @@ export default function App() {
 
             {/* Card 2: Administrative Control Board */}
             <div 
-              onClick={() => setAdminViewMode('admin')}
-              className="group cursor-pointer bg-slate-855 hover:bg-slate-755 border border-slate-700 hover:border-sky-500 rounded-2xl p-6 shadow-lg transition-all duration-300 hover:shadow-sky-500/10 flex flex-col justify-between hover:-translate-y-1 relative overflow-hidden"
+              onClick={() => isManagerOrAdmin ? setAdminViewMode('admin') : alert(`Nhân viên phân quyền "${authenticatedStaff?.role || 'Nhân viên'}" không có quyền truy cập Trang Quản Trị.`)}
+              className={`group bg-slate-855 border rounded-2xl p-6 shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden ${
+                isManagerOrAdmin 
+                  ? 'cursor-pointer hover:bg-slate-755 border-slate-700 hover:border-sky-500 hover:shadow-sky-500/10 hover:-translate-y-1' 
+                  : 'cursor-not-allowed border-slate-800 opacity-60'
+              }`}
             >
               {/* Speed Badge */}
               <div className="absolute top-4 right-4 bg-slate-800 border border-slate-700 text-slate-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider">
@@ -656,35 +699,190 @@ export default function App() {
               </div>
 
               <div>
-                <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white transition-all duration-300">
+                <div className={`w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-4 transition-all duration-300 ${isManagerOrAdmin ? 'group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white' : 'opacity-50'}`}>
                   <Sliders className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-black text-white group-hover:text-sky-400 transition-colors uppercase tracking-wide">
+                <h3 className={`text-lg font-black text-white uppercase tracking-wide transition-colors ${isManagerOrAdmin ? 'group-hover:text-sky-400' : ''}`}>
                   2. Trang Quản Lý Admin 📊
                 </h3>
                 <p className="text-slate-400 text-xs leading-relaxed mt-2.5">
                   Bản tin quản lý toàn hệ thống. Cấu hình thực đơn món ăn, quản lý danh sách danh mục, tạo chương trình khuyến mãi, xem biểu đồ báo cáo doanh số, cấu hình phần cứng.
                 </p>
+                {!isManagerOrAdmin && (
+                  <p className="text-rose-400 text-[10px] font-bold mt-3 bg-rose-500/10 border border-rose-500/20 px-2 py-1.5 rounded-md">
+                    🔒 Yêu cầu phân quyền "Quản lý" hoặc "Admin"
+                  </p>
+                )}
               </div>
 
               <div className="mt-6">
                 <button 
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setAdminViewMode('admin'); }}
-                  className="w-full py-2.5 rounded-xl bg-slate-750 group-hover:bg-sky-600 text-white text-[11px] font-black uppercase tracking-wider transition-colors shadow-md border border-slate-700"
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if (isManagerOrAdmin) {
+                      setAdminViewMode('admin');
+                    } else {
+                      alert(`Nhân viên phân quyền "${authenticatedStaff?.role || 'Nhân viên'}" không có quyền truy cập Trang Quản Trị.`);
+                    }
+                  }}
+                  className={`w-full py-2.5 rounded-xl text-white text-[11px] font-black uppercase tracking-wider transition-colors shadow-md border ${
+                    isManagerOrAdmin 
+                      ? 'bg-slate-750 group-hover:bg-sky-600 border-slate-700 cursor-pointer' 
+                      : 'bg-slate-800 border-slate-700/50 text-slate-500 cursor-not-allowed'
+                  }`}
                 >
-                  Vào Trang Quản Trị Hệ Thống ➜
+                  {isManagerOrAdmin ? 'Vào Trang Quản Trị Hệ Thống ➜' : 'Không Có Quyền Truy Cập 🔒'}
                 </button>
               </div>
             </div>
 
           </div>
 
+          {/* Add to Home Screen Quick Action Pill */}
+          <div className="flex flex-col items-center gap-2.5 w-full max-w-sm mb-8 p-4 bg-slate-800/40 rounded-2xl border border-slate-700/30 text-center animate-fade-in">
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-[11px] font-black uppercase tracking-wider shadow-md hover:shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <Download className="w-4 h-4 animate-bounce" />
+              Thêm Khai Vị POS vào Màn Hình Chính
+            </button>
+            <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+              Tạo lối tắt ứng dụng với logo cực đẹp ngoài màn hình điện thoại hoặc máy tính để mở nhanh không qua trình duyệt.
+            </p>
+          </div>
+
+          {/* INSTALLATION GUIDE DIALOG MODAL */}
+          {showInstallGuide && (
+            <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl relative animate-fade-in text-xs text-slate-200">
+                <button 
+                  type="button" 
+                  onClick={() => setShowInstallGuide(false)}
+                  className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer text-base font-black p-1"
+                >
+                  ✕
+                </button>
+
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-14 h-14 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center p-0.5 shadow-lg mb-3 overflow-hidden">
+                    <img 
+                      src="/icon.jpg" 
+                      alt="Logo App" 
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <h3 className="font-extrabold text-sm text-white uppercase tracking-wider mb-1">
+                    Cài Đặt Lối Tắt Màn Hình
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                    {storeConfig.name || 'Khai Vị POS'}
+                  </p>
+                </div>
+
+                {/* Detect Platform Instructions */}
+                {(() => {
+                  const ua = navigator.userAgent;
+                  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                  
+                  if (isIOS) {
+                    return (
+                      <div className="space-y-4">
+                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3 text-[11px] leading-relaxed font-medium">
+                          👉 <strong>Lưu ý cho iOS (iPhone/iPad):</strong> Trình duyệt Safari trên iOS không cho phép tự động cài đặt qua nút bấm. Bạn vui lòng tự thêm thủ công theo 3 bước chạm dưới đây:
+                        </div>
+                        <ol className="space-y-3.5 text-[11px] leading-relaxed text-left">
+                          <li className="flex items-start gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">1</span>
+                            <div>
+                              Chạm vào nút <strong>Chia sẻ</strong> <Share2 className="w-3.5 h-3.5 inline mx-1 text-sky-400" /> ở thanh menu công cụ dưới đáy màn hình Safari.
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">2</span>
+                            <div>
+                              Cuộn nhẹ danh sách lên rồi nhấn vào tuỳ chọn <strong>"Thêm vào MH chính"</strong> (Add to Home Screen) <Plus className="w-3.5 h-3.5 inline mx-1 text-slate-200 bg-slate-800 rounded p-0.5" />.
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">3</span>
+                            <div>
+                              Nhấn nút <strong>Thêm</strong> (Add) ở góc trên bên phải để hoàn tất cài đặt!
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="bg-orange-500/10 border border-orange-500/20 text-orange-300 rounded-xl p-3 text-[11px] leading-relaxed font-medium">
+                        Hướng dẫn thêm phím tắt lối tắt trực tiếp ra màn hình chính điện thoại hoặc máy tính:
+                      </div>
+                      <ol className="space-y-3.5 text-[11px] leading-relaxed text-left">
+                        <li className="flex items-start gap-2">
+                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">1</span>
+                          <div>
+                            Click vào nút <strong>Ba chấm đứng</strong> <MoreVertical className="w-3.5 h-3.5 inline mx-1 text-slate-400" /> ở góc thanh trình duyệt.
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">2</span>
+                          <div>
+                            Nhấn chọn mục <strong>"Cài đặt ứng dụng"</strong> (Install App) hoặc <strong>"Thêm vào màn hình chính"</strong> (Add to Home screen).
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">3</span>
+                          <div>
+                            Nhấn <strong>Xác nhận cài đặt</strong> để tạo lối tắt mở nhanh POS bất kỳ lúc nào!
+                          </div>
+                        </li>
+                      </ol>
+                    </div>
+                  );
+                })()}
+
+                {/* Dev / iframe advice wrapper */}
+                <div className="pt-3 border-t border-slate-800 space-y-2.5">
+                  <div className="text-[10px] text-slate-500 text-center leading-relaxed font-semibold">
+                    💡 <strong>Mẹo nhỏ:</strong> Nếu đang chạy thử nghiệm của AI Studio, vui lòng mở trang độc lập trong tab mới để hiển thị đầy đủ pop-up cài đặt của hệ điều hành.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open(window.location.href, '_blank')}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Mở Trang Độc Lập Mới
+                  </button>
+                </div>
+                
+                <div className="flex justify-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowInstallGuide(false)}
+                    className="py-1.5 px-6 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold tracking-wide transition-colors text-[10px] cursor-pointer uppercase"
+                  >
+                    Đã hiểu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Global Exit */}
           {isMobileViewport ? (
             <button
               onClick={() => {
-                setIsAdminAuthenticated(false);
+                setAuthenticatedStaff(null);
                 setMobileMode('client');
               }}
               className="text-slate-500 hover:text-white font-bold text-xs uppercase tracking-wide transition pb-1 border-b border-transparent hover:border-slate-500 flex items-center gap-1.5"
@@ -693,7 +891,7 @@ export default function App() {
             </button>
           ) : (
             <button
-              onClick={() => setIsAdminAuthenticated(false)}
+              onClick={() => setAuthenticatedStaff(null)}
               className="text-rose-400 hover:text-rose-300 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 px-4 py-1.5 bg-rose-500/10 rounded-full border border-rose-500/20 transition-all hover:bg-rose-500/20 cursor-pointer"
             >
               🔒 Đăng Xuất & Khóa Hệ Thống
@@ -755,11 +953,12 @@ export default function App() {
           ) : !isAdminAuthenticated ? (
             <div className="bg-slate-900 min-h-screen pb-16 flex flex-col justify-center">
               <AdminLockScreen 
-                onSuccess={() => {
-                  setIsAdminAuthenticated(true);
+                onSuccess={(staff) => {
+                  setAuthenticatedStaff(staff);
                   setAdminViewMode('picker');
                 }}
                 onCancel={() => setMobileMode('client')}
+                staffList={storeConfig.staff || []}
                 adminPin={storeConfig.adminPin}
               />
             </div>
@@ -786,32 +985,36 @@ export default function App() {
                 onUpdateStoreConfig={handleUpdateStoreConfig}
                 onAddOrder={handleAddOrder}
                 onLogout={() => {
-                  setIsAdminAuthenticated(false);
+                  setAuthenticatedStaff(null);
                   setMobileMode('client');
                 }}
                 onBackToPicker={() => setAdminViewMode('picker')}
+                authenticatedStaff={authenticatedStaff}
               />
             </div>
           ) : (
             /* Standalone Lightweight Cashier POS on Mobile Screen */
-            <div className={`${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard).outerBg} min-h-screen pb-16 flex flex-col`}>
-              <div className={`${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard).headerBg} p-2.5 px-3 shrink-0 flex items-center justify-between`}>
-                <span className={`text-[10px] uppercase font-black tracking-wider ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard).subText}`}>Thu Ngân POS</span>
+            <div className={`${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai).outerBg} min-h-screen pb-16 flex flex-col`}>
+              <div className={`${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai).headerBg} p-2.5 px-3 shrink-0 flex items-center justify-between`}>
+                <div className={`text-[10px] uppercase font-black tracking-wider ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai).subText} flex flex-col`}>
+                  <span>Thu Ngân POS</span>
+                  {authenticatedStaff && <span className="opacity-75 text-[8.5px] font-semibold mt-1 tracking-normal">👤 {authenticatedStaff.fullName}</span>}
+                </div>
                 <div className="flex gap-1.5">
                   <button
                     type="button"
                     onClick={() => setAdminViewMode('picker')}
-                    className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase transition duration-150 shadow-xs ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard).btnBack}`}
+                    className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase transition duration-150 shadow-xs ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai).btnBack}`}
                   >
                     Đổi Phân Hệ
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setIsAdminAuthenticated(false);
+                      setAuthenticatedStaff(null);
                       setMobileMode('client');
                     }}
-                    className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase transition duration-150 shadow-xs ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard).btnLock}`}
+                    className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase transition duration-150 shadow-xs ${(cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai).btnLock}`}
                   >
                     Khóa Máy
                   </button>
@@ -829,9 +1032,10 @@ export default function App() {
                   onUpdateOrders={handleUpdateOrders}
                   onUpdateTables={handleUpdateTables}
                   onAddOrder={handleAddOrder}
-                  t={appThemeStyles[adminTheme] || appThemeStyles.standard}
+                  t={appThemeStyles[adminTheme] || appThemeStyles.dai}
                   adminTheme={adminTheme}
                   isMobileViewport={isMobileViewport}
+                  authenticatedStaff={authenticatedStaff}
                 />
               </div>
             </div>
@@ -883,7 +1087,79 @@ export default function App() {
     }
     
     if (adminViewMode === 'cashier') {
-      const ch = cashierHeaderStyles[adminTheme] || cashierHeaderStyles.standard;
+      const ch = cashierHeaderStyles[adminTheme] || cashierHeaderStyles.dai;
+      
+      if (adminTheme === 'dai') {
+        return (
+          <div className={`w-full h-screen flex flex-col md:flex-row font-sans animate-fade-in overflow-hidden select-none bg-[#f8f9fe]`}>
+            {/* Left Minimalist Sidebar for Dai Theme */}
+            <div className="hidden md:flex w-[80px] bg-white border-r border-indigo-50 flex-col items-center py-6 justify-between shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
+              <div className="flex flex-col items-center gap-6 w-full">
+                <div onClick={() => setAdminViewMode('picker')} className="w-[42px] h-[42px] bg-gradient-to-br from-[#7052ff] to-[#5136e0] rounded-[14px] flex items-center justify-center shadow-lg shadow-indigo-500/30 cursor-pointer hover:scale-105 transition-transform text-white">
+                  <Grid className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col items-center gap-4 w-full mt-4">
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><BarChart className="w-5 h-5" /></button>
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><ShoppingBag className="w-5 h-5" /></button>
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><History className="w-5 h-5" /></button>
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><FileText className="w-5 h-5" /></button>
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><Users className="w-5 h-5" /></button>
+                  <button className="w-12 h-12 flex items-center justify-center text-indigo-200 hover:text-[#7052ff] hover:bg-indigo-50 rounded-2xl transition-all"><Settings className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="w-[42px] h-[42px] bg-indigo-50 rounded-full flex items-center justify-center font-black text-[#7052ff] text-sm cursor-pointer border border-indigo-100">
+                {logoInfo.initials.substring(0,2)}
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col h-full overflow-hidden p-0 md:p-6 pb-0">
+              {/* Top Header */}
+              <div className="flex items-center justify-between mb-0 md:mb-6 px-4 md:px-2 pt-4 md:pt-0 shrink-0">
+                <div>
+                  <h1 className="text-xl md:text-[22px] font-black text-[#2e335b] tracking-tight uppercase flex items-center gap-2">
+                    THU NGÂN POS
+                  </h1>
+                  {authenticatedStaff && (
+                    <div className="flex items-center gap-1.5 mt-1 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                      <span className="w-3 h-3 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden"><User className="w-2.5 h-2.5" /></span>
+                      {authenticatedStaff.fullName}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setAdminViewMode('picker')} className="flex items-center gap-1.5 px-4 md:px-5 py-2.5 bg-white border border-indigo-100 text-[#7052ff] rounded-[14px] text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-indigo-50 transition-all">
+                    <Grid className="w-3.5 h-3.5" /> Đổi phân hệ
+                  </button>
+                  <button onClick={() => setAuthenticatedStaff(null)} className="flex items-center gap-1.5 px-4 md:px-5 py-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-[14px] text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-rose-100 transition-all">
+                    <Lock className="w-3.5 h-3.5" /> Khóa máy
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Cashier Workspace wrapped in big white canvas */}
+              <div className="flex-1 bg-white md:rounded-t-[32px] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-slate-100/50 flex flex-col">
+                <CashierPOS
+                  products={products}
+                  categories={categories}
+                  promotions={promotions}
+                  storeConfig={storeConfig}
+                  orders={orders}
+                  tables={tables}
+                  areas={areas}
+                  onUpdateOrders={handleUpdateOrders}
+                  onUpdateTables={handleUpdateTables}
+                  onAddOrder={handleAddOrder}
+                  t={appThemeStyles[adminTheme] || appThemeStyles.dai}
+                  adminTheme={adminTheme}
+                  isMobileViewport={isMobileViewport}
+                  authenticatedStaff={authenticatedStaff}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className={`w-full h-screen flex flex-col font-sans animate-fade-in overflow-hidden select-none ${ch.outerBg}`}>
           {/* Standalone Cashier Top Utility Header */}
@@ -894,7 +1170,16 @@ export default function App() {
                 <span className="text-[5.5px] font-extrabold uppercase tracking-tighter block -mt-1.5 font-sans">{logoInfo.subtitle}</span>
               </div>
               <div>
-                <span className={`${ch.subText} uppercase text-[8.5px] tracking-widest block leading-tight`}>CHỦ TIỆM ĐANG SỬ DỤNG</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`${ch.subText} uppercase text-[8.5px] tracking-widest leading-tight`}>
+                    HỆ THỐNG QUẢN LÝ TẠI QUẦY
+                  </span>
+                  {authenticatedStaff && (
+                    <span className="px-2 py-0.5 rounded-sm bg-white/10 border border-white/20 text-[8px] font-bold uppercase tracking-wider text-white shadow-sm flex items-center gap-1">
+                      <span className="opacity-70">{authenticatedStaff.role || 'Nhân viên'}:</span> {authenticatedStaff.fullName}
+                    </span>
+                  )}
+                </div>
                 <h1 className={`text-sm font-black uppercase tracking-wider flex items-center gap-1.5 leading-none ${ch.titleText}`}>
                   🪑 PHÂN HỆ THU NGÂN POS ĐỘC LẬP SIỆU NHẸ
                 </h1>
@@ -913,7 +1198,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setIsAdminAuthenticated(false)}
+                onClick={() => setAuthenticatedStaff(null)}
                 className={`px-4 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition duration-150 flex items-center gap-1 cursor-pointer shadow-sm ${ch.btnLock}`}
                 title="Khóa màn hình máy"
               >
@@ -934,9 +1219,10 @@ export default function App() {
               onUpdateOrders={handleUpdateOrders}
               onUpdateTables={handleUpdateTables}
               onAddOrder={handleAddOrder}
-              t={appThemeStyles[adminTheme] || appThemeStyles.standard}
+              t={appThemeStyles[adminTheme] || appThemeStyles.dai}
               adminTheme={adminTheme}
               isMobileViewport={isMobileViewport}
+              authenticatedStaff={authenticatedStaff}
             />
           </div>
         </div>
@@ -1006,10 +1292,11 @@ export default function App() {
       <div className="flex-1 flex flex-col bg-slate-50/50 overflow-hidden relative">
         {!isAdminAuthenticated ? (
           <AdminLockScreen 
-            onSuccess={() => {
-              setIsAdminAuthenticated(true);
+            onSuccess={(staff) => {
+              setAuthenticatedStaff(staff);
               setAdminViewMode('picker');
             }}
+            staffList={storeConfig.staff || []}
             adminPin={storeConfig.adminPin}
           />
         ) : (
@@ -1029,8 +1316,9 @@ export default function App() {
             onUpdateAreas={handleUpdateAreas}
             onUpdateStoreConfig={handleUpdateStoreConfig}
             onAddOrder={handleAddOrder}
-            onLogout={() => setIsAdminAuthenticated(false)}
+            onLogout={() => setAuthenticatedStaff(null)}
             onBackToPicker={() => setAdminViewMode('picker')}
+            authenticatedStaff={authenticatedStaff}
           />
         )}
       </div>

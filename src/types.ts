@@ -81,6 +81,8 @@ export interface Order {
   note?: string;
   adminNote?: string;
   cancellationReason?: string;
+  createdBy?: string; // Tên nhân viên hoặc "Khách"
+  paidBy?: string; // Tên nhân viên thu tiền
 }
 
 export interface Staff {
@@ -92,6 +94,7 @@ export interface Staff {
   birthYear: number;
   role: string;
   avatar: string;
+  pin?: string;
 }
 
 export interface TelegramConfig {
@@ -117,7 +120,7 @@ export interface StoreConfig {
   openHours: string;
   customQrCodeUrl?: string;
   logoUrl?: string;
-  theme?: 'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026';
+  theme?: 'cyberpunk' | 'aura2026' | 'dai';
   useDynamicQrAmount?: boolean;
   adminPin?: string;
   staff?: Staff[];

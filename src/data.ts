@@ -776,7 +776,7 @@ const DEFAULT_STORE_CONFIG: StoreConfig = {
   bankAccountName: "NGUYEN VAN BEP VIET",
   openHours: "10:00 - 23:30",
   customQrCodeUrl: "",
-  theme: "standard",
+  theme: "dai",
   useDynamicQrAmount: true
 };
 
