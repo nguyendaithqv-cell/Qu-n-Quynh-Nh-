@@ -28,7 +28,9 @@ import {
   Image as FileImage,
   Download,
   MapPin,
-  Bell
+  Bell,
+  Grid,
+  Armchair
 } from 'lucide-react';
 import { Product, Category, Order, OrderItem, OrderStatus, PaymentStatus, StoreConfig, Promotion, Table, Area } from '../types';
 import ReportSection from './ReportSection';
@@ -47,8 +49,9 @@ interface CashierPOSProps {
   onUpdateOrders: (orders: Order[]) => void;
   onAddOrder: (order: Order) => Promise<void>;
   t: any; // Theme variables from AdminPanel
-  adminTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11';
+  adminTheme: 'cyberpunk' | 'aura2026' | 'dai';
   isMobileViewport?: boolean;
+  authenticatedStaff?: any;
 }
 
 export default function CashierPOS({
@@ -64,7 +67,8 @@ export default function CashierPOS({
   onAddOrder,
   t,
   adminTheme,
-  isMobileViewport = false
+  isMobileViewport = false,
+  authenticatedStaff
 }: CashierPOSProps) {
   // Navigation / Filter states
   const [selectedTable, setSelectedTable] = useState<string>('Table_1');
@@ -410,7 +414,7 @@ export default function CashierPOS({
       };
 
       await onAddOrder(newOrd);
-      await logAndNotify('Cashier', 'Tạo đơn hàng mới', `Đơn: ${newOrd.billCode}, Bàn: ${tblName}`, ['admin', 'cashier']);
+      await logAndNotify(authenticatedStaff?.fullName || 'Cashier', 'Tạo đơn hàng mới', `Đơn: ${newOrd.billCode}, Bàn: ${tblName}`, ['admin', 'cashier']);
     }
 
     setHasChanges(false);
@@ -448,7 +452,7 @@ export default function CashierPOS({
     };
 
     onUpdateOrders(orders.map(o => o.id === currentOrder.id ? updatedOrder : o));
-    await logAndNotify('Cashier', 'Chuyển bàn', `Từ ${currentSelectedTableDetail?.name} sang ${targetTblName}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Cashier', 'Chuyển bàn', `Từ ${currentSelectedTableDetail?.name} sang ${targetTblName}`, ['admin', 'cashier']);
     setSelectedTable(transferTargetTableId);
     setShowTransferModal(false);
   };
@@ -505,7 +509,7 @@ export default function CashierPOS({
       return o;
     }));
 
-    await logAndNotify('Cashier', 'Gộp bàn', `${currentSelectedTableDetail?.name} vào ${targetTblDetail.name}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Cashier', 'Gộp bàn', `${currentSelectedTableDetail?.name} vào ${targetTblDetail.name}`, ['admin', 'cashier']);
     setSelectedTable(mergeTargetTableId);
     setShowMergeModal(false);
     alert(`Đã gộp thành công ${currentSelectedTableDetail?.name} vào ${targetTblDetail.name}!`);
@@ -614,11 +618,12 @@ export default function CashierPOS({
       customerName: updatedCustomerName,
       customerPhone: updatedCustomerPhone,
       note: updatedNote,
+      paidBy: authenticatedStaff ? authenticatedStaff.fullName : 'Khách',
       adminNote: (currentOrder.adminNote || '') + ` [${storeConfig.name || 'Hệ Thống'} POS: Đã thanh toán qua ${isPayAsDebt ? 'Ghi nợ sổ sách' : (payingMethod === 'cod' ? 'Tiền mặt' : 'Chuyển khoản QR')}]`
     };
 
     onUpdateOrders(orders.map(o => o.id === currentOrder.id ? completedOrder : o));
-    await logAndNotify('Cashier', 'Thanh toán', `Đơn ${completedOrder.billCode} - ${isPayAsDebt ? 'Ghi nợ' : 'Đã trả'}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Cashier', 'Thanh toán', `Đơn ${completedOrder.billCode} - ${isPayAsDebt ? 'Ghi nợ' : 'Đã trả'}`, ['admin', 'cashier']);
     
     // Hold onto structured completed order details so print modal shows the finalized stats
     setPrintBillData(completedOrder);
@@ -676,7 +681,7 @@ export default function CashierPOS({
 
   const confirmDeleteItem = async () => {
     if (!itemToDelete) return;
-    await logAndNotify('Cashier', 'Bỏ món', `Món: ${itemToDelete.productName}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Cashier', 'Bỏ món', `Món: ${itemToDelete.productName}`, ['admin', 'cashier']);
     setPosCart(prev => prev.filter(i => i.productId !== itemToDelete.productId));
     setHasChanges(true);
     setItemToDelete(null);
@@ -767,50 +772,6 @@ export default function CashierPOS({
 
   // Visual layout configurations that are safe for theme palettes
   const colorMap = {
-    standard: {
-      sidebarBg: 'bg-stone-50 border-stone-200 text-stone-850',
-      activeCard: 'border-orange-500 bg-orange-50/50 shadow-orange-100',
-      emptyCard: 'border-slate-100 hover:border-orange-200 bg-white shadow-xs',
-      subHeader: 'text-stone-500 font-bold uppercase tracking-wider',
-      tabActive: 'bg-orange-600 text-white',
-      badgeOccupied: 'bg-orange-500 text-white',
-      badgeFree: 'bg-[#f0f9f1] text-[#2ebd4d]',
-      wrapperBg: 'bg-slate-50 text-slate-800',
-      cardBg: 'bg-white border-slate-200 shadow-sm text-slate-800',
-      secCardBg: 'bg-stone-50 border-stone-200 text-slate-800',
-      textPrimary: 'text-slate-900',
-      textSecondary: 'text-slate-800',
-      textMuted: 'text-slate-500',
-      borderClass: 'border-stone-200/60',
-      inputBg: 'bg-white border-stone-200 text-slate-800 font-bold',
-      realtimeTipBg: 'bg-orange-50/50 border-orange-100/80',
-      occupiedTextPrimary: 'text-slate-850',
-      occupiedTextMuted: 'text-slate-500',
-      emptyTextPrimary: 'text-slate-800',
-      emptyTextMuted: 'text-stone-400/80'
-    },
-    vista: {
-      sidebarBg: 'bg-white/45 backdrop-blur-md border-white/50 text-slate-900',
-      activeCard: 'border-sky-500 bg-sky-50/65 shadow-sky-100/50',
-      emptyCard: 'border-white/50 hover:border-sky-500/40 bg-white/70 backdrop-blur-md shadow-xs',
-      subHeader: 'text-sky-600 font-bold uppercase tracking-wider',
-      tabActive: 'bg-gradient-to-b from-sky-400 via-sky-600 to-sky-700 text-white shadow-sm border border-sky-650',
-      badgeOccupied: 'bg-sky-500 text-white',
-      badgeFree: 'bg-emerald-50 text-emerald-600 border border-emerald-100',
-      wrapperBg: 'bg-gradient-to-br from-sky-100/20 via-slate-100 to-emerald-100/20 text-slate-800',
-      cardBg: 'bg-white/70 backdrop-blur-md border-white/50 shadow-md text-slate-800',
-      secCardBg: 'bg-slate-200/40 backdrop-blur-sm border-white/35 text-slate-800',
-      textPrimary: 'text-slate-950 drop-shadow-[0_0.5px_0_rgba(255,255,255,0.8)]',
-      textSecondary: 'text-slate-850',
-      textMuted: 'text-slate-500',
-      borderClass: 'border-white/45',
-      inputBg: 'bg-white/85 border-slate-250 text-slate-800 font-semibold',
-      realtimeTipBg: 'bg-white/60 backdrop-blur-xs border-white/50',
-      occupiedTextPrimary: 'text-sky-950',
-      occupiedTextMuted: 'text-sky-700/80',
-      emptyTextPrimary: 'text-slate-800',
-      emptyTextMuted: 'text-slate-450'
-    },
     cyberpunk: {
       sidebarBg: 'bg-[#121420]/95 border-[#45f3ff]/20 text-[#c5c6c7]',
       activeCard: 'border-[#ff0055]/85 bg-[#1a0c12]/95 shadow-[0_0_15px_rgba(255,0,85,0.2)] text-white',
@@ -833,31 +794,31 @@ export default function CashierPOS({
       emptyTextPrimary: 'text-[#c5c6c7]',
       emptyTextMuted: 'text-slate-500'
     },
-    win11: {
-      sidebarBg: 'bg-[#f9f9f9]/95 backdrop-blur-md border-zinc-200 text-zinc-800',
-      activeCard: 'border-[#0078d4]/90 bg-[#0078d4]/8 shadow-[0_4px_12px_rgba(0,120,212,0.12)]',
-      emptyCard: 'border-zinc-200 bg-white/90 hover:border-zinc-300 shadow-xs',
-      subHeader: 'text-zinc-500 font-bold uppercase tracking-wider',
-      tabActive: 'bg-[#0078d4] text-white shadow-xs',
-      badgeOccupied: 'bg-[#0078d4] text-white',
-      badgeFree: 'bg-zinc-100 text-zinc-700',
-      wrapperBg: 'bg-[#f3f3f3] text-zinc-800',
-      cardBg: 'bg-white border-zinc-250 shadow-xs text-zinc-800',
-      secCardBg: 'bg-[#f9f9f9] border-zinc-200 text-zinc-800',
-      textPrimary: 'text-zinc-900',
-      textSecondary: 'text-zinc-700',
-      textMuted: 'text-zinc-500',
-      borderClass: 'border-zinc-250/90',
-      inputBg: 'bg-white border-zinc-350 text-zinc-800 font-semibold',
-      realtimeTipBg: 'bg-zinc-150 border-zinc-200',
-      occupiedTextPrimary: 'text-zinc-900',
-      occupiedTextMuted: 'text-zinc-500',
-      emptyTextPrimary: 'text-zinc-850',
-      emptyTextMuted: 'text-zinc-450'
+    dai: {
+      sidebarBg: 'bg-white border-slate-100/50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] text-slate-800',
+      activeCard: 'border-orange-200 bg-orange-50/50 ring-1 ring-orange-200 shadow-sm transition-all text-slate-800',
+      emptyCard: 'border-emerald-100 bg-white ring-1 ring-emerald-100 shadow-sm text-slate-800 hover:shadow-md hover:border-emerald-200 transition-all',
+      subHeader: 'text-slate-400 font-extrabold uppercase tracking-wide',
+      tabActive: 'bg-[#7052ff] text-white shadow-md shadow-indigo-500/20',
+      badgeOccupied: 'bg-orange-100 text-orange-600 font-bold border-0 shadow-sm',
+      badgeFree: 'bg-emerald-50 text-emerald-600 font-bold border-0',
+      wrapperBg: 'bg-[#f8f9fe] text-slate-800',
+      cardBg: 'bg-white border-slate-100/80 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] text-slate-800',
+      secCardBg: 'bg-[#f8f9fe] border-slate-100/50 rounded-[16px] text-slate-800',
+      textPrimary: 'text-[#2e335b] font-black tracking-tight',
+      textSecondary: 'text-slate-600 font-medium',
+      textMuted: 'text-slate-400 font-medium',
+      borderClass: 'border-slate-100/80',
+      inputBg: 'bg-[#f8f9fe] border-slate-200/80 text-slate-700 font-semibold focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 rounded-xl',
+      realtimeTipBg: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+      occupiedTextPrimary: 'text-slate-800 font-black',
+      occupiedTextMuted: 'text-orange-500 font-bold',
+      emptyTextPrimary: 'text-slate-800 font-bold',
+      emptyTextMuted: 'text-slate-400 font-semibold'
     }
   };
 
-  const cm = colorMap[adminTheme] || colorMap.standard;
+  const cm = colorMap[adminTheme] || colorMap.dai;
 
   // Filtered tables logic
   const filteredGridTables = useMemo(() => {
@@ -910,50 +871,114 @@ export default function CashierPOS({
           <NotificationIcon role="cashier" />
           
           {/* Quick status counters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
-            <button
-              onClick={() => setTableFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap ${
-                tableFilter === 'all' 
-                  ? 'bg-slate-800 text-white shadow-sm' 
-                  : `${cm.secCardBg} hover:opacity-90 text-xs`
-              }`}
-            >
-              Tất Cả ({tables.length})
-            </button>
-            <button
-              onClick={() => setTableFilter('occupied')}
-              className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap flex items-center gap-1 ${
-                tableFilter === 'occupied' 
-                  ? 'bg-orange-600 text-white shadow-sm' 
-                  : 'bg-orange-50/20 hover:bg-orange-100/30 text-orange-600 border border-orange-200/30'
-              }`}
-            >
-              Đang Ăn ({activeTblOrderCount})
-            </button>
-            <button
-              onClick={() => setTableFilter('empty')}
-              className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap flex items-center gap-1 ${
-                tableFilter === 'empty' 
-                  ? 'bg-emerald-600 text-white shadow-sm' 
-                  : 'bg-emerald-50/20 hover:bg-emerald-100/30 text-emerald-600 border border-emerald-200/30'
-              }`}
-            >
-              Trống ({tables.length - activeTblOrderCount})
-            </button>
-          </div>
+          {adminTheme === 'dai' ? (
+            <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 overflow-x-auto no-scrollbar pb-2 pt-1">
+              <div
+                onClick={() => setTableFilter('all')}
+                className={`flex-1 min-w-[150px] p-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 border ${
+                  tableFilter === 'all' 
+                    ? 'bg-gradient-to-br from-indigo-50 to-white border-indigo-200 ring-1 ring-indigo-200 shadow-md shadow-indigo-500/10' 
+                    : 'bg-white border-indigo-50 hover:border-indigo-100 hover:shadow-sm'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-[#7052ff] to-[#5136e0] flex items-center justify-center text-white shadow-md shadow-indigo-500/30 shrink-0">
+                  <Grid className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-[#7052ff] uppercase tracking-wider block">TẤT CẢ</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-[#2e335b]">{tables.length}</span>
+                    <span className="text-[10px] font-bold text-slate-400">BÀN</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                onClick={() => setTableFilter('occupied')}
+                className={`flex-1 min-w-[150px] p-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 border ${
+                  tableFilter === 'occupied' 
+                    ? 'bg-gradient-to-br from-orange-50/50 to-white border-orange-200 ring-1 ring-orange-200 shadow-md shadow-orange-500/10' 
+                    : 'bg-white border-orange-50/50 hover:border-orange-100 hover:shadow-sm'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-[#ff8c42] to-[#ff6b00] flex items-center justify-center text-white shadow-md shadow-orange-500/30 shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-[#ff6b00] uppercase tracking-wider block">ĐANG ĂN</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-[#2e335b]">{activeTblOrderCount}</span>
+                    <span className="text-[10px] font-bold text-slate-400">BÀN</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                onClick={() => setTableFilter('empty')}
+                className={`flex-1 min-w-[150px] p-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 border ${
+                  tableFilter === 'empty' 
+                    ? 'bg-gradient-to-br from-emerald-50/50 to-white border-emerald-200 ring-1 ring-emerald-200 shadow-md shadow-emerald-500/10' 
+                    : 'bg-white border-emerald-50 hover:border-emerald-100 hover:shadow-sm'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-[#00d084] to-[#00b06b] flex items-center justify-center text-white shadow-md shadow-emerald-500/30 shrink-0">
+                  <Armchair className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-[#00b06b] uppercase tracking-wider block">TRỐNG</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-[#2e335b]">{tables.length - activeTblOrderCount}</span>
+                    <span className="text-[10px] font-bold text-slate-400">BÀN</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
+              <button
+                onClick={() => setTableFilter('all')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap ${
+                  tableFilter === 'all' 
+                    ? 'bg-slate-800 text-white shadow-sm' 
+                    : `${cm.secCardBg} hover:opacity-90 text-xs`
+                }`}
+              >
+                Tất Cả ({tables.length})
+              </button>
+              <button
+                onClick={() => setTableFilter('occupied')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap flex items-center gap-1 ${
+                  tableFilter === 'occupied' 
+                    ? 'bg-orange-600 text-white shadow-sm' 
+                    : 'bg-orange-50/20 hover:bg-orange-100/30 text-orange-600 border border-orange-200/30'
+                }`}
+              >
+                Đang Ăn ({activeTblOrderCount})
+              </button>
+              <button
+                onClick={() => setTableFilter('empty')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all uppercase whitespace-nowrap flex items-center gap-1 ${
+                  tableFilter === 'empty' 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : 'bg-emerald-50/20 hover:bg-emerald-100/30 text-emerald-600 border border-emerald-200/30'
+                }`}
+              >
+                Trống ({tables.length - activeTblOrderCount})
+              </button>
+            </div>
+          )}
         </div>
- 
+
         {/* Area Tabs Filter */}
         {cashierAreas.length > 0 && (
-          <div className="mb-4 flex items-center bg-white/50 p-2 rounded-xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
+          <div className={`mb-4 flex items-center ${adminTheme === 'dai' ? 'bg-white shadow-[0_2px_12px_rgba(0,0,0,0.03)]' : 'bg-white/50 shadow-sm'} p-2 rounded-xl border border-slate-100 overflow-hidden shrink-0`}>
             <div className="flex items-center gap-2 w-full">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap shrink-0 pl-1">Khu vực:</span>
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1 px-1">
                 <button
                   onClick={() => setAreaFilterId('all')}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap flex-none ${
-                    areaFilterId === 'all' ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  className={`px-4 py-1.5 rounded-[12px] text-[10px] font-black uppercase transition-all whitespace-nowrap flex-none ${
+                    areaFilterId === 'all' 
+                      ? (adminTheme === 'dai' ? 'bg-[#7052ff] text-white shadow-md shadow-indigo-500/20' : 'bg-orange-600 text-white shadow-sm') 
+                      : (adminTheme === 'dai' ? 'bg-[#f4f5f9] text-slate-500 hover:bg-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')
                   }`}
                 >
                   Tất cả
@@ -965,8 +990,10 @@ export default function CashierPOS({
                     <button
                       key={area.id}
                       onClick={() => setAreaFilterId(area.id)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap flex items-center gap-1.5 flex-none ${
-                        areaFilterId === area.id ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      className={`px-4 py-1.5 rounded-[12px] text-[10px] font-black uppercase transition-all whitespace-nowrap flex items-center gap-1.5 flex-none ${
+                        areaFilterId === area.id 
+                          ? (adminTheme === 'dai' ? 'bg-[#7052ff] text-white shadow-md shadow-indigo-500/20' : 'bg-orange-600 text-white shadow-sm')
+                          : (adminTheme === 'dai' ? 'bg-[#f4f5f9] text-slate-500 hover:bg-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')
                       }`}
                     >
                       <span>{area.name}</span>
@@ -1010,12 +1037,14 @@ export default function CashierPOS({
                 {/* Table Title and Status dot */}
                 <div className="flex justify-between items-start gap-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-base w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                    <span className={`text-base w-10 h-10 md:w-8 md:h-8 lg:w-10 lg:h-10 rounded-[14px] flex items-center justify-center shrink-0 ${
                       isShip 
-                        ? 'bg-amber-100 dark:bg-amber-955 text-amber-600' 
+                        ? 'bg-amber-100 text-amber-600' 
                         : isBooking 
-                          ? 'bg-sky-100 dark:bg-sky-955 text-sky-600' 
-                          : 'bg-orange-100/70 dark:bg-orange-955/40 text-orange-600'
+                          ? 'bg-sky-100 text-sky-600' 
+                          : tbl.isOccupied
+                            ? (adminTheme === 'dai' ? 'bg-[#ffe8d6] text-[#ff6b00]' : 'bg-orange-100/70 text-orange-600')
+                            : (adminTheme === 'dai' ? 'bg-[#d1f4e0] text-[#00b06b]' : 'bg-slate-100/70 text-slate-500')
                     }`}>
                       {isShip ? '🚀' : isBooking ? '📅' : '🪑'}
                     </span>
@@ -1062,18 +1091,18 @@ export default function CashierPOS({
                       );
                     })()
                   ) : tbl.isOccupied ? (
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-rose-500/10 text-rose-600 font-extrabold uppercase animate-pulse whitespace-nowrap shrink-0">
-                      Bận
+                    <span className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase whitespace-nowrap shrink-0 font-bold ${cm.badgeOccupied}`}>
+                      BẬN
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/10 text-emerald-500 font-extrabold uppercase whitespace-nowrap shrink-0">
-                      Trống
+                    <span className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase whitespace-nowrap shrink-0 font-bold ${cm.badgeFree}`}>
+                      TRỐNG
                     </span>
                   )}
                 </div>
  
                 {/* Main description bottom or active receipt */}
-                <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                <div className={`mt-2.5 pt-2 border-t ${adminTheme === 'dai' ? (tbl.isOccupied ? 'border-orange-100' : 'border-slate-100') : cm.borderClass}`}>
                   {tbl.isOccupied && tbl.activeOrder ? (
                     <div className="space-y-0.5">
                       <div className={`font-extrabold font-sans line-clamp-1 text-[10px] tracking-tight ${
@@ -1226,9 +1255,10 @@ export default function CashierPOS({
                 <span>Khách hàng: <strong>{currentActiveOrder.customerName}</strong></span>
                 <span>Mã Bill: <strong className="font-mono text-orange-500">{currentActiveOrder.billCode}</strong></span>
               </div>
-              {currentActiveOrder.customerPhone && (
-                <p className="text-[#0078d4]">SĐT: {currentActiveOrder.customerPhone}</p>
-              )}
+              <div className={`flex justify-between ${cm.textSecondary}`}>
+                <span>{currentActiveOrder.customerPhone ? `SĐT: ${currentActiveOrder.customerPhone}` : ''}</span>
+                {currentActiveOrder.createdBy && <span>Tạo: <strong className={cm.textClass}>{currentActiveOrder.createdBy}</strong></span>}
+              </div>
               {currentActiveOrder.note && (
                 <p className="text-rose-500 italic font-medium">
                   Yêu cầu: "{currentActiveOrder.note}"
@@ -2062,7 +2092,9 @@ export default function CashierPOS({
                   <p>Mã hóa đơn: <strong className="font-mono" style={{ color: '#1e293b' }}>{printBillData.billCode}</strong></p>
                   <p>Bàn phục vụ: <strong style={{ color: '#1e293b' }}>{printBillData.customerAddress}</strong></p>
                   <p>Ngày lập: {new Date(printBillData.createdAt).toLocaleString('vi-VN')}</p>
-                  <p>Nhân viên: POS-Cashier-01</p>
+                  {(printBillData.paidBy || printBillData.createdBy) && (
+                    <p>Thu ngân: <strong style={{ color: '#1e293b' }}>{printBillData.paidBy || printBillData.createdBy}</strong></p>
+                  )}
                 </div>
               </div>
 

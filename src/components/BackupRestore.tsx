@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Save, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { Product, Category, Order, Promotion, Table, Area, StoreConfig } from '../types';
-import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 interface BackupRestoreProps {
@@ -29,23 +29,43 @@ export default function BackupRestore({
 }: BackupRestoreProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const handleBackup = () => {
-    const backupData = {
-      products, categories, promotions, storeConfig, orders, tables, areas,
-      backupDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const restaurantName = storeConfig.name ? storeConfig.name.replace(/\s+/g, '_') : 'quan';
-    const date = new Date().toLocaleString('vi-VN').replace(/[/:]/g, '-');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${restaurantName}_${date}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      // Fetch system activity logs dynamically from firesore so they are backed up together
+      const logsSnapshot = await getDocs(collection(db, 'activityLogs'));
+      const activityLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const backupData = {
+        products, 
+        categories, 
+        promotions, 
+        storeConfig, 
+        orders, 
+        tables, 
+        areas, 
+        activityLogs,
+        backupDate: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const restaurantName = storeConfig.name ? storeConfig.name.replace(/\s+/g, '_') : 'quan';
+      const date = new Date().toLocaleString('vi-VN').replace(/[/:]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${restaurantName}_${date}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi sao lưu dữ liệu.');
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,39 +90,55 @@ export default function BackupRestore({
 
         setProgress(30);
 
-        // Perform Firestore updates
-        const batch = writeBatch(db);
+        // Collect all write operations
+        const operations: { col: string; id: string; data: any }[] = [];
         
         const itemsToSave = [
-            { col: 'products', items: data.products },
-            { col: 'categories', items: data.categories },
+            { col: 'products', items: data.products || [] },
+            { col: 'categories', items: data.categories || [] },
             { col: 'promotions', items: data.promotions || [] },
             { col: 'orders', items: data.orders || [] },
             { col: 'tables', items: data.tables || [] },
             { col: 'areas', items: data.areas || [] },
+            { col: 'activityLogs', items: data.activityLogs || [] },
         ];
         
         itemsToSave.forEach(({ col, items }) => {
             items.forEach((item: any) => {
-                const itemRef = doc(db, col, item.id);
-                batch.set(itemRef, item);
+                if (item && item.id) {
+                    operations.push({ col, id: item.id, data: item });
+                }
             });
         });
-        
-        // Save storeConfig
-        if(data.storeConfig) {
-            batch.set(doc(db, 'storeConfig', 'global'), data.storeConfig);
-        }
 
-        setProgress(60);
-        await batch.commit();
+        // Setup sanitized storeConfig to maintain structure safety
+        const sanitizedStoreConfig = data.storeConfig || {};
+        const validThemes = ['cyberpunk', 'aura2026', 'dai'];
+        if (!sanitizedStoreConfig.theme || !validThemes.includes(sanitizedStoreConfig.theme)) {
+            sanitizedStoreConfig.theme = 'dai';
+        }
+        operations.push({ col: 'storeConfig', id: 'global', data: sanitizedStoreConfig });
+
+        // Commit in chunks of 400 writes to strictly avoid Firestore's 500-commit Batch Write limit
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+            const chunk = operations.slice(i, i + CHUNK_SIZE);
+            const chunkBatch = writeBatch(db);
+            chunk.forEach(op => {
+                chunkBatch.set(doc(db, op.col, op.id), op.data);
+            });
+            const subProgress = Math.round(30 + (i / operations.length) * 55);
+            setProgress(subProgress);
+            await chunkBatch.commit();
+        }
+        
         setProgress(90);
 
         // Update local state
         onUpdateProducts(data.products || []);
         onUpdateCategories(data.categories || []);
         onUpdatePromotions(data.promotions || []);
-        onUpdateStoreConfig(data.storeConfig || {});
+        onUpdateStoreConfig(sanitizedStoreConfig);
         onUpdateOrders(data.orders || []);
         onUpdateTables(data.tables || []);
         onUpdateAreas(data.areas || []);
@@ -128,9 +164,10 @@ export default function BackupRestore({
       <div className="flex gap-3">
         <button 
           onClick={handleBackup}
+          disabled={isBackingUp || isRestoring}
           className={`${t.btnSec} flex items-center gap-2`}
         >
-          <Save className="w-4 h-4" /> Sao lưu dữ liệu
+          {isBackingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {isBackingUp ? 'Đang tải sao lưu...' : 'Sao lưu dữ liệu'}
         </button>
         <button 
           onClick={() => fileInputRef.current?.click()}

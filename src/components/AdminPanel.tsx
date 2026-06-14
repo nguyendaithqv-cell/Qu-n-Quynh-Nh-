@@ -66,6 +66,7 @@ interface AdminPanelProps {
   onAddOrder: (order: Order) => Promise<void>;
   onLogout?: () => void;
   onBackToPicker?: () => void;
+  authenticatedStaff?: any;
 }
 
 export default function AdminPanel({
@@ -85,7 +86,8 @@ export default function AdminPanel({
   onUpdateStoreConfig,
   onAddOrder,
   onLogout,
-  onBackToPicker
+  onBackToPicker,
+  authenticatedStaff
 }: AdminPanelProps) {
   // Navigation
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'tables' | 'promotions' | 'store' | 'customers' | 'report' | 'system' | 'staff'>('orders');
@@ -96,10 +98,12 @@ export default function AdminPanel({
   // Staff management state
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [staffModalError, setStaffModalError] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState<any>({
     fullName: '',
     username: '',
     password: '',
+    pin: '',
     phone: '',
     birthYear: new Date().getFullYear() - 20,
     role: 'Nhân viên',
@@ -108,10 +112,12 @@ export default function AdminPanel({
 
   const openAddStaff = () => {
     setEditingStaffId(null);
+    setStaffModalError(null);
     setNewStaff({
       fullName: '',
       username: '',
       password: '',
+      pin: '',
       phone: '',
       birthYear: new Date().getFullYear() - 20,
       role: 'Nhân viên',
@@ -122,6 +128,7 @@ export default function AdminPanel({
 
   const openEditStaff = (staff: any) => {
     setEditingStaffId(staff.id);
+    setStaffModalError(null);
     setNewStaff({ ...staff });
     setIsStaffModalOpen(true);
   };
@@ -129,7 +136,25 @@ export default function AdminPanel({
   const handleSaveStaff = async () => {
     const staffList = storeConfig.staff || [];
     const staffToSave = { ...newStaff };
+    setStaffModalError(null);
     
+    // Check PIN duplication
+    if (staffToSave.pin) {
+      if (staffToSave.pin === '1506') {
+        setStaffModalError('Mã PIN "1506" là mã mặc định của hệ thống.');
+        return;
+      }
+      if (storeConfig.adminPin && staffToSave.pin === storeConfig.adminPin) {
+        setStaffModalError('Mã PIN này đã trùng với mã PIN Admin cấu hình trong cài đặt!');
+        return;
+      }
+      const existing = staffList.find(s => s.pin === staffToSave.pin && s.id !== editingStaffId);
+      if (existing) {
+        setStaffModalError('Mã PIN này đã có người sử dụng. Vui lòng chọn mã khác!');
+        return;
+      }
+    }
+
     // Safety check: Don't save large base64 images to Firestore document if they exceed typical limits.
     // For now, if avatar is too large (likely Base64), reset to a default if user just wants it to work.
     if (staffToSave.avatar && staffToSave.avatar.length > 5000) {
@@ -142,21 +167,21 @@ export default function AdminPanel({
             ...storeConfig,
             staff: staffList.map(s => s.id === editingStaffId ? { ...staffToSave, id: editingStaffId } : s)
         });
-        await logAction('Admin', 'Cập nhật nhân viên', `Nhân viên: ${staffToSave.fullName}`);
+        await logAction(authenticatedStaff?.fullName || 'Admin', 'Cập nhật nhân viên', `Nhân viên: ${staffToSave.fullName}`);
     } else {
         // Add
         onUpdateStoreConfig({
             ...storeConfig,
             staff: [...staffList, { ...staffToSave, id: Date.now().toString() }]
         });
-        await logAction('Admin', 'Thêm nhân viên mới', `Tên: ${staffToSave.fullName}`);
+        await logAction(authenticatedStaff?.fullName || 'Admin', 'Thêm nhân viên mới', `Tên: ${staffToSave.fullName}`);
     }
     setIsStaffModalOpen(false);
   };
 
   // System Theme & Settings States
-  const [adminTheme, setAdminTheme] = useState<'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026'>(
-    () => storeConfig.theme || (localStorage.getItem('admin-panel-theme') as any) || 'standard'
+  const [adminTheme, setAdminTheme] = useState<'cyberpunk' | 'aura2026' | 'dai'>(
+    () => storeConfig.theme || (localStorage.getItem('admin-panel-theme') as any) || 'dai'
   );
   const [audioEnabled, setAudioEnabled] = useState<boolean>(
     () => localStorage.getItem('system-audio-enabled') !== 'false'
@@ -179,13 +204,13 @@ export default function AdminPanel({
     }
   }, [storeConfig.theme]);
 
-  const handleThemeChange = async (newTheme: 'standard' | 'vista' | 'cyberpunk' | 'win11' | 'aura2026') => {
+  const handleThemeChange = async (newTheme: 'cyberpunk' | 'aura2026' | 'dai') => {
     setAdminTheme(newTheme);
     onUpdateStoreConfig({
       ...storeConfig,
       theme: newTheme
     });
-    await logAction('Admin', 'Đổi giao diện', `Giao diện mới: ${newTheme}`);
+    await logAction(authenticatedStaff?.fullName || 'Admin', 'Đổi giao diện', `Giao diện mới: ${newTheme}`);
   };
 
   useEffect(() => {
@@ -205,6 +230,7 @@ export default function AdminPanel({
 
   // Sub States
   const [editingConfig, setEditingConfig] = useState<StoreConfig>({ ...storeConfig });
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setEditingConfig({ ...storeConfig });
@@ -382,26 +408,53 @@ export default function AdminPanel({
   const customers: Customer[] = React.useMemo(() => {
     const custMap = orders.reduce((acc, order) => {
       const { customerPhone, customerName, totalAmount, paymentStatus, customerAddress } = order;
-      if (!acc[customerPhone]) {
-        acc[customerPhone] = {
-          phone: customerPhone,
-          firstName: customerName,
+      
+      const phone = (customerPhone || '').trim().replace(/\s+/g, '');
+      const name = (customerName || '').trim();
+      
+      if (!phone || phone === '0900000000' || !name) {
+        return acc;
+      }
+
+      const lowerName = name.toLowerCase();
+      if (
+        lowerName.includes('khách vãng lai') || 
+        lowerName.includes('khach vang lai') || 
+        lowerName.includes('vãng lai') ||
+        lowerName.includes('vang lai') ||
+        lowerName.match(/^(bàn|ban|b\d+|t\d+)\s*\d*$/) ||
+        name.match(/^N\d+$/) ||
+        lowerName === 'khách' ||
+        lowerName === 'khach'
+      ) {
+        return acc;
+      }
+
+      if (!acc[phone]) {
+        acc[phone] = {
+          phone: phone,
+          firstName: name,
           totalOrders: 0,
           totalSpent: 0,
-          address: customerAddress,
+          address: customerAddress || '',
           debtOrders: 0,
           debtAmount: 0,
-          notes: new Set([customerName])
+          notes: new Set<string>()
         };
       }
-      const cust = acc[customerPhone];
+      const cust = acc[phone];
       cust.totalOrders++;
       cust.totalSpent += totalAmount;
       if (paymentStatus === 'debt') {
         cust.debtOrders++;
         cust.debtAmount += totalAmount;
       }
-      cust.notes.add(customerName);
+      if (name !== cust.firstName) {
+        cust.notes.add(`Tên phụ: ${name}`);
+      }
+      if (order.note && order.note.trim()) {
+        cust.notes.add(order.note.trim());
+      }
       return acc;
     }, {} as any);
 
@@ -410,6 +463,102 @@ export default function AdminPanel({
       notes: Array.from(c.notes)
     }));
   }, [orders]);
+
+  // Customer views & pagination states
+  const [customerPage, setCustomerPage] = useState<number>(1);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editCustName, setEditCustName] = useState<string>('');
+  const [editCustPhone, setEditCustPhone] = useState<string>('');
+  const [editCustAddress, setEditCustAddress] = useState<string>('');
+
+  const CUSTOMERS_PER_PAGE = 15;
+  const totalCustomerPages = Math.ceil(customers.length / CUSTOMERS_PER_PAGE) || 1;
+  const paginatedCustomers = React.useMemo(() => {
+    const startIndex = (customerPage - 1) * CUSTOMERS_PER_PAGE;
+    return customers.slice(startIndex, startIndex + CUSTOMERS_PER_PAGE);
+  }, [customers, customerPage]);
+
+  useEffect(() => {
+    if (activeTab === 'customers') {
+      setCustomerPage(1);
+    }
+  }, [activeTab]);
+
+  const handleOpenEditCustomer = (cust: Customer) => {
+    setEditingCustomer(cust);
+    setEditCustName(cust.firstName);
+    setEditCustPhone(cust.phone);
+    setEditCustAddress(cust.address || '');
+  };
+
+  const handleSaveCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+
+    const normName = editCustName.trim();
+    const normPhone = editCustPhone.trim().replace(/\s+/g, '');
+    const normAddress = editCustAddress.trim();
+
+    if (!normName) {
+      alert('Vui lòng nhập tên khách hàng!');
+      return;
+    }
+    if (!normPhone || normPhone === '0900000000') {
+      alert('Số điện thoại không hợp lệ hoặc trùng số điện thoại mặc định!');
+      return;
+    }
+
+    try {
+      const oldPhone = editingCustomer.phone.trim().replace(/\s+/g, '');
+      const updatedOrders = orders.map(o => {
+        const cleanOPhone = (o.customerPhone || '').trim().replace(/\s+/g, '');
+        if (cleanOPhone === oldPhone) {
+          return {
+            ...o,
+            customerPhone: normPhone,
+            customerName: normName,
+            customerAddress: normAddress
+          };
+        }
+        return o;
+      });
+
+      await onUpdateOrders(updatedOrders);
+      await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Cập nhật khách hàng', `SĐT cũ: ${oldPhone} sang SĐT mới: ${normPhone} (${normName})`, ['admin', 'cashier']);
+      setEditingCustomer(null);
+      alert('Cập nhật thông tin khách hàng thành công!');
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi cập nhật khách hàng.');
+    }
+  };
+
+  const handleDeleteCustomer = async (phone: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa khách hàng với SĐT ${phone}? Các hoá đơn của khách này sẽ được chuyển thành Khách vãng lai để bảo toàn doanh thu.`)) return;
+
+    try {
+      const updatedOrders = orders.map(o => {
+        const cleanOPhone = (o.customerPhone || '').trim().replace(/\s+/g, '');
+        const cleanTargetPhone = phone.trim().replace(/\s+/g, '');
+        if (cleanOPhone === cleanTargetPhone) {
+          return {
+            ...o,
+            customerPhone: '0900000000',
+            customerName: 'Khách vãng lai',
+            customerAddress: ''
+          };
+        }
+        return o;
+      });
+
+      await onUpdateOrders(updatedOrders);
+      await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Xoá khách hàng', `SĐT: ${phone}`, ['admin', 'cashier']);
+      alert(`Đã xóa thông tin khách hàng ${phone} thành công!`);
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi xoá khách hàng.');
+    }
+  };
 
   // Order Operations
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
@@ -429,7 +578,7 @@ export default function AdminPanel({
     });
     onUpdateOrders(updated);
     const order = orders.find(o => o.id === orderId);
-    await logAndNotify('Admin', 'Thay đổi trạng thái đơn', `Đơn ${order?.billCode} sang ${newStatus}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Thay đổi trạng thái đơn', `Đơn ${order?.billCode} sang ${newStatus}`, ['admin', 'cashier']);
   };
 
   const handleConfirmCancelOrder = () => {
@@ -454,7 +603,7 @@ export default function AdminPanel({
     if (orderToDelete) {
       const updated = orders.filter(o => o.id !== orderToDelete.id);
       onUpdateOrders(updated);
-      await logAndNotify('Admin', 'Xoá đơn', `Đơn ${orderToDelete.billCode}`, ['admin', 'cashier']);
+      await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Xoá đơn', `Đơn ${orderToDelete.billCode}`, ['admin', 'cashier']);
       setOrderToDelete(null);
     }
   };
@@ -524,7 +673,7 @@ export default function AdminPanel({
     }
     const updated = orders.map(o => o.id === editingOrder.id ? editingOrder : o);
     onUpdateOrders(updated);
-    await logAndNotify('Admin', 'Sửa đơn', `Đơn ${editingOrder.billCode}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Sửa đơn', `Đơn ${editingOrder.billCode}`, ['admin', 'cashier']);
     setEditingOrder(null);
   };
 
@@ -539,7 +688,7 @@ export default function AdminPanel({
     };
 
     onUpdateProducts([...products, prodToAdd]);
-    await logAndNotify('Admin', 'Thêm món', `Món: ${prodToAdd.name}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Thêm món', `Món: ${prodToAdd.name}`, ['admin', 'cashier']);
     setIsAddingProduct(false);
     setNewProduct({
       name: '',
@@ -557,7 +706,7 @@ export default function AdminPanel({
 
     const updated = products.map(p => p.id === editingProduct.id ? editingProduct : p);
     onUpdateProducts(updated);
-    await logAndNotify('Admin', 'Sửa món', `Món: ${editingProduct.name}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Sửa món', `Món: ${editingProduct.name}`, ['admin', 'cashier']);
     setEditingProduct(null);
   };
 
@@ -570,7 +719,7 @@ export default function AdminPanel({
     if (productToDelete) {
       const updated = products.filter(p => p.id !== productToDelete.id);
       onUpdateProducts(updated);
-      await logAndNotify('Admin', 'Xoá món', `Món: ${productToDelete.name}`, ['admin', 'cashier']);
+      await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Xoá món', `Món: ${productToDelete.name}`, ['admin', 'cashier']);
       setProductToDelete(null);
     }
   };
@@ -612,7 +761,7 @@ export default function AdminPanel({
     };
 
     onUpdateCategories([...categories, catToAdd]);
-    await logAndNotify('Admin', 'Thêm danh mục', `Danh mục: ${catToAdd.name}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Thêm danh mục', `Danh mục: ${catToAdd.name}`, ['admin', 'cashier']);
     setIsAddingCategory(false);
     setNewCategory({ name: '', icon: '🥡', type: 'food' });
   };
@@ -623,7 +772,7 @@ export default function AdminPanel({
 
     const updated = categories.map(c => c.id === editingCategory.id ? editingCategory : c);
     onUpdateCategories(updated);
-    await logAndNotify('Admin', 'Sửa danh mục', `Danh mục: ${editingCategory.name}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Sửa danh mục', `Danh mục: ${editingCategory.name}`, ['admin', 'cashier']);
     setEditingCategory(null);
   };
 
@@ -658,8 +807,9 @@ export default function AdminPanel({
   const handleConfirmDeleteCategory = async () => {
     if (categoryToDelete) {
       const updated = categories.filter(c => c.id !== categoryToDelete.id);
+      onUpdateOrders(orders); // Trigger ordering update (trigger list update)
       onUpdateCategories(updated);
-      await logAndNotify('Admin', 'Xoá danh mục', `Danh mục: ${categoryToDelete.name}`, ['admin', 'cashier']);
+      await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Xoá danh mục', `Danh mục: ${categoryToDelete.name}`, ['admin', 'cashier']);
       setCategoryToDelete(null);
     }
   };
@@ -676,7 +826,7 @@ export default function AdminPanel({
     };
 
     onUpdatePromotions([...promotions, promoToAdd]);
-    await logAndNotify('Admin', 'Thêm khuyến mãi', `Mã: ${promoToAdd.code}`, ['admin', 'cashier']);
+    await logAndNotify(authenticatedStaff?.fullName || 'Admin', 'Thêm khuyến mãi', `Mã: ${promoToAdd.code}`, ['admin', 'cashier']);
     setIsAddingPromotion(false);
     setNewPromo({
       code: '',
@@ -818,9 +968,10 @@ export default function AdminPanel({
       const snapshot = await getDocs(q);
       const logs = snapshot.docs.map(doc => doc.data());
       
-      const content = logs.map(log => `[${new Date(log.timestamp).toLocaleString()}] ${log.staffUsername || 'System'}: ${log.action} - ${log.details || ''}`).join('\n');
+      const content = logs.map(log => `[${new Date(log.timestamp).toLocaleString('vi-VN')}] ${log.staffUsername || 'System'}: ${log.action} - ${log.details || ''}`).join('\n');
       
-      const blob = new Blob([content], { type: 'text/plain' });
+      // Inject UTF-8 BOM (\uFEFF) to guarantee correct encoding on dual platform viewers (e.g., Android, NotePad)
+      const blob = new Blob(["\uFEFF" + content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -943,6 +1094,22 @@ export default function AdminPanel({
   const handleSaveStoreConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check PIN duplication for admin
+    if (editingConfig.adminPin) {
+      if (editingConfig.adminPin === '1506') {
+        setSaveStatus('Mã PIN "1506" là mã mặc định của hệ thống.');
+        setTimeout(() => setSaveStatus(null), 3000);
+        return;
+      }
+      const staffList = storeConfig.staff || [];
+      const existing = staffList.find(s => s.pin === editingConfig.adminPin);
+      if (existing) {
+        setSaveStatus('Mã PIN này đã có nhân viên sử dụng.');
+        setTimeout(() => setSaveStatus(null), 3000);
+        return;
+      }
+    }
+
     // Strip large avatars before saving
     const cleanedConfig = {
       ...editingConfig,
@@ -952,9 +1119,15 @@ export default function AdminPanel({
       }))
     };
     
-    onUpdateStoreConfig(cleanedConfig);
-    await logAction('Admin', 'Cấu hình cửa hàng', 'Cập nhật thông tin cửa hàng');
-    alert('Đã cập nhật thông tin cài đặt cửa hàng thành công!');
+    try {
+      onUpdateStoreConfig(cleanedConfig);
+      await logAction(authenticatedStaff?.fullName || 'Admin', 'Cấu hình cửa hàng', 'Cập nhật thông tin cửa hàng');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
+    }
   };
 
   const getStatusColorClass = (status: OrderStatus) => {
@@ -985,56 +1158,6 @@ export default function AdminPanel({
   };
 
   const themeStyles = {
-    standard: {
-      pageWrapper: 'flex-1 overflow-y-auto px-6 py-6 font-sans text-slate-800 bg-slate-50/50',
-      titleBar: 'text-slate-800 border-b border-slate-100 pb-3',
-      textClass: 'text-slate-800 font-sans',
-      textMuted: 'text-[#828282] font-semibold',
-      textTitle: 'text-slate-900 font-extrabold pb-1 uppercase tracking-wider',
-      card: 'bg-white border border-slate-200/60 shadow-sm rounded-2xl hover:shadow-md transition-all duration-200',
-      cardSec: 'bg-slate-50 border border-slate-200 rounded-2xl p-4',
-      btnAccent: 'bg-orange-600 hover:bg-orange-700 text-white font-extrabold pb-2 pt-2 px-4 rounded-xl shadow-sm transition-all uppercase tracking-wider',
-      btnSec: 'bg-white hover:bg-slate-50 text-slate-705 border border-slate-200 font-bold pb-2 pt-2 px-4 rounded-xl shadow-xs transition-all uppercase tracking-wide',
-      tabActive: 'bg-orange-600 text-white shadow-sm',
-      tabInactive: 'text-slate-600 hover:bg-slate-100/50',
-      tabContainer: 'flex border-b border-slate-200 mb-6 bg-white rounded-xl p-1 shadow-xs font-semibold text-xs overflow-x-auto no-scrollbar',
-      tableHeader: 'bg-slate-50 text-slate-500 font-extrabold uppercase border-b border-slate-100',
-      tableHeaderCell: 'hover:bg-slate-100 text-slate-505 cursor-pointer p-3',
-      tableRow: 'hover:bg-slate-50/50 even:bg-slate-50/45 odd:bg-white transition-all',
-      tableCellBorder: 'border-slate-100 border-r',
-      badge: 'bg-slate-100 border border-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded-md text-[10px]',
-      input: 'bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-850 outline-none focus:bg-white focus:border-orange-500',
-      icon: 'text-orange-605',
-      divider: 'border-slate-100',
-      titleSpin: 'text-orange-600 animate-spin-slow',
-      panelTitle: storeConfig.name ? `Trang Quản Lý - ${storeConfig.name}` : 'Trang Quản Lý',
-      subText: 'Thống số tổng quan'
-    },
-    vista: {
-      pageWrapper: 'flex-1 overflow-y-auto px-6 py-6 font-sans text-slate-800 bg-gradient-to-br from-sky-100/30 via-slate-150 to-emerald-100/30 relative overflow-x-hidden',
-      titleBar: 'text-slate-900 border-b border-white/40 pb-4 relative before:absolute before:inset-x-0 before:-top-2 before:h-1 before:bg-gradient-to-r before:from-sky-400 before:to-emerald-400',
-      textClass: 'text-slate-800 font-sans',
-      textMuted: 'text-slate-500 font-black uppercase tracking-wider text-[10px]',
-      textTitle: 'text-slate-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.85)] font-black uppercase tracking-wide',
-      card: 'bg-white/70 backdrop-blur-md border border-white/50 shadow-[0_8px_20px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.7)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.1)] transition-all duration-300 rounded-2xl overflow-hidden',
-      cardSec: 'bg-slate-200/40 backdrop-blur-sm border border-white/35 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] rounded-2xl p-4',
-      btnAccent: 'bg-gradient-to-b from-sky-450 to-sky-700 hover:to-sky-650 text-white hover:shadow-[0_4px_12px_rgba(3,105,161,0.3)] border border-sky-600 relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-[50%] before:bg-white/20 font-black pb-2 pt-2 px-4 rounded-xl shadow-md transition-all uppercase tracking-wider',
-      btnSec: 'bg-gradient-to-b from-white to-slate-100/90 hover:from-white hover:to-slate-50 text-slate-705 border border-slate-250 hover:border-slate-350 shadow-sm relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-[50%] before:bg-white/30 font-bold pb-2 pt-2 px-4 rounded-xl transition-all uppercase tracking-wide',
-      tabActive: 'bg-gradient-to-b from-sky-400 via-sky-600 to-sky-700 text-white shadow-[0_2px_8px_rgba(3,105,161,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] border border-sky-650 relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-[50%] before:bg-white/35',
-      tabInactive: 'bg-gradient-to-b from-white to-slate-100/85 hover:from-white hover:to-slate-50 text-slate-650 hover:text-slate-850 border border-slate-200/80 hover:border-slate-300 shadow-xs active:bg-slate-200',
-      tabContainer: 'flex border-b border-white/40 mb-6 bg-white/45 backdrop-blur-md border border-white/45 p-1 rounded-xl shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] font-semibold text-xs overflow-x-auto no-scrollbar',
-      tableHeader: 'bg-gradient-to-b from-slate-100 to-slate-200 text-slate-750 font-extrabold uppercase border-b border-slate-300 relative before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-white/80',
-      tableHeaderCell: 'hover:bg-slate-300 text-slate-750 cursor-pointer p-3.5 border-r border-slate-200',
-      tableRow: 'hover:bg-sky-100/50 even:bg-slate-100/25 odd:bg-white/45 transition-all backdrop-blur-xs',
-      tableCellBorder: 'border-slate-200 border-r',
-      badge: 'bg-white/60 backdrop-blur-xs border border-white/50 text-slate-600 font-mono text-[10px] uppercase font-black px-2 py-0.5 rounded-md inline-block',
-      input: 'bg-white/80 border border-slate-250 hover:border-slate-350 focus:border-sky-500 rounded-xl px-3 py-2 font-semibold text-slate-850 outline-none shadow-inner transition-colors focus:bg-white',
-      icon: 'text-sky-600 drop-shadow-[0_0.5px_0.5px_rgba(255,255,255,0.85)]',
-      divider: 'border-slate-200/80',
-      titleSpin: 'text-sky-600 animate-pulse',
-      panelTitle: `Trang Quản Lý Aero - ${storeConfig.name || 'Cửa Hàng'}`,
-      subText: 'Thống số tổng quan'
-    },
     cyberpunk: {
       pageWrapper: 'flex-1 overflow-y-auto px-6 py-6 font-mono text-[#c5c6c7] bg-[#0b0c10] relative overflow-x-hidden',
       titleBar: 'text-[#66fcf1] border-b border-[#45f3ff]/30 pb-3 shadow-[0_1px_4px_rgba(102,252,241,0.15)]',
@@ -1109,10 +1232,35 @@ export default function AdminPanel({
       titleSpin: 'text-[#9b6bcc] animate-spin-slow',
       panelTitle: `Trang Quản Lý Aura - ${storeConfig.name || 'Cửa Hàng'}`,
       subText: 'Thống số tổng quan (Aura Style)'
+    },
+    dai: {
+      pageWrapper: 'flex-1 overflow-y-auto px-6 py-8 font-sans text-slate-800 bg-[#f8f9fe]',
+      titleBar: 'text-slate-800 border-b border-indigo-100/50 pb-3',
+      textClass: 'text-slate-800 font-medium',
+      textMuted: 'text-slate-400 font-semibold',
+      textTitle: 'text-[#2e335b] font-extrabold pb-1 uppercase tracking-wide',
+      card: 'bg-white border-0 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] hover:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08)] transition-all duration-300 overflow-hidden ring-1 ring-slate-100/50',
+      cardSec: 'bg-[#f8f9fe]/50 border border-slate-100 rounded-[24px] p-4',
+      btnAccent: 'bg-[#7052ff] hover:bg-[#6042ef] text-white shadow-md shadow-indigo-500/20 px-5 py-2.5 rounded-[14px] text-xs font-bold transition-all',
+      btnSec: 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-5 py-2.5 rounded-[14px] shadow-sm font-semibold text-xs transition-all',
+      tabActive: 'bg-[#7052ff] text-white shadow-md shadow-indigo-500/20 rounded-[12px]',
+      tabInactive: 'text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-[12px]',
+      tabContainer: 'flex gap-2 border-b border-slate-200/50 mb-8 bg-white p-2 rounded-[16px] font-semibold text-[11px] shadow-sm overflow-x-auto no-scrollbar',
+      tableHeader: 'bg-[#f4f5f9]/50 text-slate-400 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-100',
+      tableHeaderCell: 'hover:bg-slate-50 cursor-pointer p-4',
+      tableRow: 'hover:bg-[#f8f9fe]/80 transition-all border-b border-slate-50/50',
+      tableCellBorder: 'border-slate-50/50 sm:border-transparent',
+      badge: 'bg-indigo-50 text-indigo-500 border border-indigo-100/50 font-bold text-[10px] px-2.5 py-1 rounded-full inline-block',
+      input: 'bg-[#f4f5f9]/50 border border-slate-200 focus:border-[#7052ff] focus:ring-1 focus:ring-[#7052ff] rounded-[14px] px-4 py-2.5 text-slate-700 outline-none transition-all',
+      icon: 'text-[#7052ff]',
+      divider: 'border-slate-200/50',
+      titleSpin: 'text-[#7052ff]',
+      panelTitle: `Admin - ${storeConfig.name || 'Cửa Hàng'}`,
+      subText: 'Thống số tổng quan'
     }
   };
 
-  const t = themeStyles[adminTheme];
+  const t = themeStyles[adminTheme] || themeStyles.dai;
 
   return (
     <div className={t.pageWrapper}>
@@ -1157,109 +1305,185 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* Numerical Stats row */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xs uppercase font-black text-slate-500 tracking-wider">Thông số tổng quan</h3>
-            <select
-              value={masterFilters.timeRange}
-              onChange={(e) => setMasterFilters(prev => ({ ...prev, timeRange: e.target.value as TimeRange }))}
-              className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
-            >
-              <option value="all">Tất cả thời gian</option>
-              <option value="today">Hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="week_this">Tuần này</option>
-              <option value="week_last">Tuần trước</option>
-              <option value="month_this">Tháng này</option>
-              <option value="month_last">Tháng trước</option>
-              <option value="year_this">Năm này</option>
-              <option value="year_last">Năm trước</option>
-            </select>
+      {/* THÔNG SỐ TỔNG QUAN - GLOSSY 3D SECTION */}
+      <div className="bg-[#fcfcff] rounded-[2rem] p-5 lg:p-7 shadow-[0_2px_15px_rgba(0,0,0,0.03)] border border-[#e1d5e7] mb-8 relative z-10">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#f4f0fa] flex items-center justify-center shrink-0 border border-[#eadef5]">
+              <Database className="w-6 h-6 text-[#9b6bcc]" />
+            </div>
+            <div>
+              <h3 className="text-lg lg:text-xl font-black text-[#2e2640] tracking-tight mb-0.5 uppercase">Thông Số Tổng Quan</h3>
+              <p className="text-[11px] lg:text-xs text-[#8d799f] font-medium tracking-wide">Tổng hợp các chỉ số quan trọng giúp bạn nắm bắt tình hình kinh doanh</p>
+            </div>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            
-            {/* 1. Doanh thu */}
-            <div className={`${t.card} p-4 sm:p-6 relative group overflow-hidden`}>
-              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <DollarSign className={`w-12 h-12 ${t.icon}`} />
-              </div>
-              <div className="relative z-10">
-                <p className={`${t.textMuted} mb-1 sm:mb-2`}>Doanh thu</p>
-                <div className="flex items-baseline gap-1 flex-wrap">
-                  <span className={`text-xl sm:text-2xl font-black ${t.textTitle} font-mono tracking-tighter`}>
-                    {stats.totalRevenue.toLocaleString('vi-VN')}
-                  </span>
-                  <span className={`text-xs font-bold ${t.textMuted}`}>đ</span>
-                </div>
-              </div>
-              <div className="mt-3 sm:mt-4 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 px-2 py-0.5 rounded border border-emerald-100">Dòng tiền thực</span>
-              </div>
-            </div>
 
-            {/* 2. Tổng đơn */}
-            <div className={`${t.card} p-4 sm:p-6 relative group overflow-hidden`}>
-              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <ShoppingBag className={`w-12 h-12 ${t.icon}`} />
-              </div>
-              <div className="relative z-10">
-                <p className={`${t.textMuted} mb-1 sm:mb-2`}>Tổng đơn hđ</p>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-xl sm:text-2xl font-black text-orange-600 font-mono tracking-tighter`}>
-                    {stats.totalFilteredOrdersCount}
-                  </span>
-                  <span className={`text-xs font-bold ${t.textMuted}`}>Đơn</span>
-                </div>
-              </div>
-              <div className="mt-3 sm:mt-4 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                <span className="text-[9px] font-black uppercase text-orange-700 tracking-widest bg-orange-50/50 px-2 py-0.5 rounded border border-orange-100">Kinh doanh</span>
-              </div>
-            </div>
-
-            {/* 3. Mới chờ duyệt */}
-            <div className={`${t.card} p-4 sm:p-6 relative group overflow-hidden`}>
-              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Clock className={`w-12 h-12 ${t.icon}`} />
-              </div>
-              <div className="relative z-10">
-                <p className={`${t.textMuted} mb-1 sm:mb-2`}>Đang chờ duyệt</p>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-xl sm:text-2xl font-black ${t.textTitle} font-mono tracking-tighter`}>
-                    {stats.newCount}
-                  </span>
-                  <span className={`text-xs font-bold ${t.textMuted}`}>Đơn</span>
-                </div>
-              </div>
-              <div className="mt-3 sm:mt-4 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" />
-                <span className="text-[9px] font-black uppercase text-amber-700 tracking-widest bg-amber-50/50 px-2 py-0.5 rounded border border-amber-100">Cần xử lý</span>
-              </div>
-            </div>
-
-            {/* 4. Đang chuẩn bị */}
-            <div className={`${t.card} p-4 sm:p-6 relative group overflow-hidden`}>
-              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Utensils className={`w-12 h-12 ${t.icon}`} />
-              </div>
-              <div className="relative z-10">
-                <p className={`${t.textMuted} mb-1 sm:mb-2`}>Đang chế biến</p>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-xl sm:text-2xl font-black ${t.textTitle} font-mono tracking-tighter`}>
-                    {stats.preparingCount}
-                  </span>
-                  <span className={`text-xs font-bold ${t.textMuted}`}>Món</span>
-                </div>
-              </div>
-              <div className="mt-3 sm:mt-4 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
-                <span className="text-[9px] font-black uppercase text-blue-700 tracking-widest bg-blue-50/50 px-2 py-0.5 rounded border border-blue-100">Tại bếp</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+             <div className="relative">
+               <select 
+                 className="appearance-none bg-white border border-[#e1d5e7] text-[#4a3f5f] font-bold py-2.5 pl-10 pr-10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#9b6bcc]/30 shadow-sm transition-all text-xs lg:text-sm cursor-pointer"
+                 value={masterFilters.timeRange}
+                 onChange={(e) => setMasterFilters(prev => ({ ...prev, timeRange: e.target.value as TimeRange }))}
+               >
+                  <option value="all">Tất cả thời gian</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="yesterday">Hôm qua</option>
+                  <option value="week_this">Tuần này</option>
+                  <option value="week_last">Tuần trước</option>
+                  <option value="month_this">Tháng này</option>
+                  <option value="month_last">Tháng trước</option>
+                  <option value="year_this">Năm này</option>
+                  <option value="year_last">Năm trước</option>
+               </select>
+               <Clock className="w-4 h-4 text-[#9b6bcc] absolute left-3.5 top-3 pointer-events-none" />
+             </div>
           </div>
         </div>
+
+        {/* GRID OF 4 GLOSSY CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6">
+
+          {/* CARD 1: DOANH THU */}
+          <div className="relative overflow-hidden rounded-[1.5rem] lg:rounded-[2rem] p-5 lg:p-6 border border-white/40 bg-gradient-to-br from-[#20C997] to-[#12A57A] shadow-[0_8px_30px_rgba(32,201,151,0.25)] min-h-[180px] lg:min-h-[200px]">
+            {/* Glass top highlight */}
+            <div className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-3xl rounded-full translate-x-8 -translate-y-8 pointer-events-none" />
+            
+            {/* Sparkline Graphic */}
+            <div className="absolute bottom-4 right-4 w-32 h-16 opacity-[0.25] pointer-events-none text-white drop-shadow-md">
+              <svg viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                <path d="M0 45 L 20 25 L 40 35 L 60 15 L 80 25 L 100 5" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="100" cy="5" r="4" fill="currentColor" />
+                <path d="M0 45 L 20 25 L 40 35 L 60 15 L 80 25 L 100 5 V 50 H 0 Z" fill="currentColor" opacity="0.3" />
+              </svg>
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-400/40 border border-emerald-200/50 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.4)] backdrop-blur-md text-white font-black text-xl">
+                    <DollarSign className="w-5 h-5 drop-shadow-sm" />
+                  </div>
+                  <span className="text-white/95 font-black tracking-wider text-xs uppercase drop-shadow-sm">Doanh thu</span>
+                </div>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-2xl lg:text-[28px] xl:text-[32px] font-black text-white tracking-tight drop-shadow-md">{stats.totalRevenue.toLocaleString('vi-VN')}</span>
+                  <span className="text-sm font-bold text-white/90 uppercase drop-shadow-sm">Đ</span>
+                </div>
+              </div>
+              <div className="mt-auto inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] self-start">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#12A57A]">Dòng tiền thực</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 2: TỔNG ĐƠN HĐ */}
+          <div className="relative overflow-hidden rounded-[1.5rem] lg:rounded-[2rem] p-5 lg:p-6 border border-white/40 bg-gradient-to-br from-[#FF8C42] to-[#E8601C] shadow-[0_8px_30px_rgba(255,140,66,0.25)] min-h-[180px] lg:min-h-[200px]">
+            <div className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-3xl rounded-full translate-x-8 -translate-y-8 pointer-events-none" />
+            
+            <div className="absolute bottom-5 right-5 w-24 h-16 opacity-30 pointer-events-none text-white flex items-end gap-2 drop-shadow-md">
+               <div className="w-5 h-8 bg-white rounded-t-sm"></div>
+               <div className="w-5 h-12 bg-white rounded-t-sm"></div>
+               <div className="w-5 h-20 bg-white rounded-t-sm"></div>
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-orange-400/40 border border-orange-200/50 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.4)] backdrop-blur-md text-white">
+                    <ShoppingBag className="w-5 h-5 drop-shadow-sm" />
+                  </div>
+                  <span className="text-white/95 font-black tracking-wider text-xs uppercase drop-shadow-sm">Tổng đơn HĐ</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-6">
+                  <span className="text-3xl lg:text-[32px] xl:text-[36px] font-black text-white tracking-tight drop-shadow-md">{stats.totalFilteredOrdersCount}</span>
+                  <span className="text-sm font-bold text-white/90 uppercase drop-shadow-sm">Đơn</span>
+                </div>
+              </div>
+              <div className="mt-auto inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] self-start">
+                <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#E8601C]">Kinh doanh</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 3: ĐANG CHỜ DUYỆT */}
+          <div className="relative overflow-hidden rounded-[1.5rem] lg:rounded-[2rem] p-5 lg:p-6 border border-white/50 bg-gradient-to-br from-[#FFD166] to-[#F2A30F] shadow-[0_8px_30px_rgba(255,209,102,0.25)] min-h-[180px] lg:min-h-[200px]">
+            <div className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-white/50 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/40 blur-3xl rounded-full translate-x-8 -translate-y-8 pointer-events-none" />
+            
+            <div className="absolute bottom-2 right-4 w-28 h-28 opacity-30 pointer-events-none text-white drop-shadow-md">
+               <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" className="w-full h-full">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6zm2-8h8v2H8v-2zm0 4h5v2H8v-2z" />
+               </svg>
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-400/40 border border-amber-200/50 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.6)] backdrop-blur-md text-white">
+                    <Clock className="w-5 h-5 drop-shadow-sm" />
+                  </div>
+                  <span className="text-white/95 font-black tracking-wider text-xs uppercase drop-shadow-sm">Đang chờ duyệt</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-6">
+                  <span className="text-3xl lg:text-[32px] xl:text-[36px] font-black text-white tracking-tight drop-shadow-md">{stats.newCount}</span>
+                  <span className="text-sm font-bold text-white/90 uppercase drop-shadow-sm">Đơn</span>
+                </div>
+              </div>
+              <div className="mt-auto inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] self-start">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#d97706]">Cần xử lý</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 4: ĐANG CHẾ BIẾN */}
+          <div className="relative overflow-hidden rounded-[1.5rem] lg:rounded-[2rem] p-5 lg:p-6 border border-white/40 bg-gradient-to-br from-[#4D96FF] to-[#2B6CE6] shadow-[0_8px_30px_rgba(77,150,255,0.25)] min-h-[180px] lg:min-h-[200px]">
+            <div className="absolute inset-x-0 top-0 h-2/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-3xl rounded-full translate-x-8 -translate-y-8 pointer-events-none" />
+            
+            <div className="absolute bottom-2 right-1 w-24 h-24 opacity-30 pointer-events-none text-white drop-shadow-md translate-y-2">
+              <svg viewBox="0 0 100 80" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                <path d="M10 60 Q 50 10 90 60 Z"/>
+                <rect x="5" y="62" width="90" height="6" rx="3" />
+                <circle cx="50" cy="15" r="5" />
+                {/* little steam waves */}
+                <path d="M30 40 Q 35 30 30 20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7"/>
+                <path d="M50 35 Q 55 25 50 15" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.6"/>
+                <path d="M70 40 Q 75 30 70 20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7"/>
+              </svg>
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-400/40 border border-blue-200/50 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(255,255,255,0.4)] backdrop-blur-md text-white">
+                    <Utensils className="w-4 h-4 drop-shadow-sm" />
+                  </div>
+                  <span className="text-white/95 font-black tracking-wider text-xs uppercase drop-shadow-sm">Đang chế biến</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-6">
+                  <span className="text-3xl lg:text-[32px] xl:text-[36px] font-black text-white tracking-tight drop-shadow-md">{stats.preparingCount}</span>
+                  <span className="text-sm font-bold text-white/90 uppercase drop-shadow-sm">Món</span>
+                </div>
+              </div>
+              <div className="mt-auto inline-flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] self-start">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#2B6CE6]">Tại bếp</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
 
       {/* Internal Tabs Navigator */}
       <div className={t.tabContainer}>
@@ -1377,7 +1601,11 @@ export default function AdminPanel({
                     <tr key={staff.id} className={t.tableRow}>
                       <td className={`p-3 ${t.tableCellBorder}`}>
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
-                          {staff.avatar ? <img src={staff.avatar} alt={staff.fullName} className="w-full h-full object-cover" /> : staff.avatar || '👤'}
+                          {staff.avatar && (staff.avatar.startsWith('http') || staff.avatar.startsWith('data:')) ? (
+                            <img src={staff.avatar} alt={staff.fullName} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xl">{staff.avatar || '👤'}</span>
+                          )}
                         </div>
                       </td>
                       <td className={`p-3 ${t.tableCellBorder} font-bold`}>{staff.fullName}</td>
@@ -1401,39 +1629,101 @@ export default function AdminPanel({
           
           {/* Staff Modal (Add/Edit) */}
           {isStaffModalOpen && (
-             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
-                   <h3 className="font-black text-lg">{editingStaffId ? 'Sửa thông tin' : 'Thêm Nhân viên'}</h3>
+             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+                <div className={`${t.card} w-full max-w-sm p-6 space-y-5 relative`}>
                    
-                   <div className="flex justify-center">
-                     <label className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer overflow-hidden border-2 border-dashed border-slate-300">
-                      {newStaff.avatar ? <img src={newStaff.avatar} alt="Avatar" className="w-full h-full object-cover"/> : <span className="text-2xl">📷</span>}
-                      <input type="file" className="hidden" onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setNewStaff({...newStaff, avatar: reader.result as string});
-                          reader.readAsDataURL(file);
-                        }
-                      }} />
-                     </label>
+                   <div className={`flex items-center justify-between border-b ${t.divider} pb-3`}>
+                     <h3 className={`font-black text-lg uppercase tracking-tight flex items-center gap-1.5 ${t.textTitle}`}>
+                        <Edit3 className={`w-5 h-5 ${t.icon}`} />
+                        {editingStaffId ? 'Sửa thông tin' : 'Thêm Nhân Viên'}
+                     </h3>
                    </div>
                    
-                   <input type="text" placeholder="Họ tên" className={t.input} value={newStaff.fullName} onChange={e => setNewStaff({...newStaff, fullName: e.target.value})} />
-                   <input type="text" placeholder="Tên đăng nhập" className={t.input} value={newStaff.username} onChange={e => setNewStaff({...newStaff, username: e.target.value})} />
-                   <input type="password" placeholder="Mật khẩu" className={t.input} value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} />
-                   <input type="text" placeholder="SĐT" className={t.input} value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} />
-                   <input type="number" placeholder="Năm sinh" className={t.input} value={newStaff.birthYear} onChange={e => setNewStaff({...newStaff, birthYear: parseInt(e.target.value)})} />
-                   <select className={t.input} value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})}>
-                      {storeConfig.roles?.map(r => <option key={r} value={r}>{r}</option>) || <>
-                        <option value="Nhân viên">Nhân viên</option>
-                        <option value="Quản lý">Quản lý</option>
-                      </>}
-                   </select>
+                   <div className="flex justify-center">
+                     <div className="relative group">
+                       <label className={`w-24 h-24 rounded-full ${t.cardSec} flex flex-col items-center justify-center cursor-pointer overflow-hidden border-2 border-dashed ${t.divider} hover:border-orange-400 transition-all shadow-inner relative`}>
+                        {newStaff.avatar && (newStaff.avatar.startsWith('http') || newStaff.avatar.startsWith('data:')) ? (
+                          <img src={newStaff.avatar} alt="Avatar" className="w-full h-full object-cover"/>
+                        ) : (
+                          <>
+                            {newStaff.avatar && newStaff.avatar.length <= 4 && newStaff.avatar !== '👤' ? (
+                               <span className="text-3xl mb-1">{newStaff.avatar}</span>
+                            ) : (
+                              <Upload className={`w-6 h-6 ${t.icon} mb-1 opacity-60`} />
+                            )}
+                            <span className={`${t.textMuted} text-[9px]`}>Tải Ảnh Lên</span>
+                          </>
+                        )}
+                        <input type="file" className="hidden" accept="image/*" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => setNewStaff({...newStaff, avatar: reader.result as string});
+                            reader.readAsDataURL(file);
+                          }
+                        }} />
+                       </label>
+                     </div>
+                   </div>
+                   
+                   <div className="space-y-4">
+                     <div>
+                        <label className={`${t.textMuted} mb-1 block`}>Họ và tên *</label>
+                        <input type="text" placeholder="Bắt buộc" className={`${t.input} w-full`} value={newStaff.fullName || ''} onChange={e => setNewStaff({...newStaff, fullName: e.target.value})} />
+                     </div>
+                     <div>
+                        <label className={`${t.textMuted} mb-1 block`}>Tên đăng nhập *</label>
+                        <input type="text" placeholder="Bắt buộc" className={`${t.input} w-full`} value={newStaff.username || ''} onChange={e => setNewStaff({...newStaff, username: e.target.value})} />
+                     </div>
 
-                   <div className="flex gap-2 justify-end">
-                     <button onClick={() => setIsStaffModalOpen(false)} className={t.btnSec}>Hủy</button>
-                     <button onClick={handleSaveStaff} className={t.btnAccent}>Lưu</button>
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className={`${t.textMuted} mb-1 block`}>Mật khẩu</label>
+                          <input type="password" placeholder="Tùy chọn" className={`${t.input} w-full`} value={newStaff.password || ''} onChange={e => setNewStaff({...newStaff, password: e.target.value})} />
+                       </div>
+                       <div>
+                          <label className={`${t.textMuted} mb-1 block`}>Số điện thoại</label>
+                          <input type="text" placeholder="Tùy chọn" className={`${t.input} w-full`} value={newStaff.phone || ''} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} />
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className={`${t.textMuted} mb-1 block`}>Năm sinh</label>
+                          <input type="number" placeholder="YYYY" className={`${t.input} w-full`} value={newStaff.birthYear || ''} onChange={e => setNewStaff({...newStaff, birthYear: parseInt(e.target.value)})} />
+                       </div>
+                       <div>
+                          <label className={`${t.textMuted} mb-1 block`}>Phân quyền</label>
+                          <select className={`${t.input} w-full`} value={newStaff.role || 'Nhân viên'} onChange={e => setNewStaff({...newStaff, role: e.target.value})}>
+                            {storeConfig.roles?.map(r => <option key={r} value={r}>{r}</option>) || <>
+                              <option value="Nhân viên">Nhân viên</option>
+                              <option value="Quản lý">Quản lý Admin</option>
+                            </>}
+                          </select>
+                       </div>
+                     </div>
+
+                     <div>
+                        <label className={`${t.textMuted} mb-1 flex items-center gap-1`}><Lock className="w-3 h-3"/> Mã PIN Đăng Nhập (4 số) *</label>
+                        <input type="text" maxLength={4} placeholder="Ví dụ: 1234" className={`${t.input} w-full tracking-widest text-center font-bold`} value={newStaff.pin || ''} onChange={e => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setNewStaff({...newStaff, pin: val});
+                        }} />
+                     </div>
+                   </div>
+
+                   {staffModalError && (
+                     <div className="bg-rose-50 text-rose-600 text-xs p-3 rounded-xl border border-rose-100 font-bold flex items-center gap-2 mt-2">
+                       <AlertCircle className="w-4 h-4 shrink-0" />
+                       {staffModalError}
+                     </div>
+                   )}
+
+                   <div className={`flex gap-3 justify-end pt-4 border-t ${t.divider}`}>
+                     <button onClick={() => setIsStaffModalOpen(false)} className={t.btnSec}>Hủy Bỏ</button>
+                     <button onClick={handleSaveStaff} className={t.btnAccent}>
+                        <Save className="w-3 h-3 inline mr-1" /> Lưu
+                     </button>
                    </div>
                 </div>
              </div>
@@ -1441,14 +1731,14 @@ export default function AdminPanel({
 
           {/* Role Management Section */}
           <div className={`${t.card} p-5 space-y-4`}>
-            <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+            <h3 className={`font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 border-b pb-2 ${t.divider}`}>
               Quản lý chức vụ
             </h3>
             <div className="flex gap-2 flex-wrap">
               {storeConfig.roles?.map(role => (
-                <span key={role} className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-xs font-bold">
+                <span key={role} className={`${t.badge} flex items-center gap-1.5 px-3 py-1.5 shadow-sm`}>
                   {role}
-                  <button onClick={() => onUpdateStoreConfig({...storeConfig, roles: storeConfig.roles?.filter(r => r !== role)})}>×</button>
+                  <button className="opacity-60 hover:opacity-100 hover:text-rose-500 transition-colors" onClick={() => onUpdateStoreConfig({...storeConfig, roles: storeConfig.roles?.filter(r => r !== role)})}>×</button>
                 </span>
               ))}
             </div>
@@ -1542,12 +1832,17 @@ export default function AdminPanel({
                       {paginatedOrders.map(order => (
                         <tr key={order.id} className="hover:bg-slate-50/50">
                           
-                          {/* Code/Date */}
+                          {/* Code/Date/Creator */}
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             <span className="font-bold text-orange-600 block text-xs font-mono tracking-wider">{order.billCode}</span>
                             <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
                                {new Date(order.createdAt).toLocaleString('vi-VN')}
                             </span>
+                            {order.createdBy && (
+                              <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
+                                Tạo: <strong className="text-slate-600">{order.createdBy}</strong>
+                              </span>
+                            )}
                           </td>
 
                           {/* Table & Area info */}
@@ -1640,6 +1935,11 @@ export default function AdminPanel({
                               <option value="paid">Đã thanh toán</option>
                               <option value="debt">Ghi nợ</option>
                             </select>
+                            {order.paidBy && order.paymentStatus === 'paid' && (
+                              <span className="block mt-1 text-[9px] text-emerald-700 font-medium whitespace-nowrap">
+                                Thu: <strong>{order.paidBy}</strong>
+                              </span>
+                            )}
                           </td>
     
                           {/* Actions */}
@@ -1779,6 +2079,16 @@ export default function AdminPanel({
                   </h3>
                   <p className="text-[10px] text-slate-400 font-bold font-mono">
                     Thời gian tạo: {new Date(editingOrder.createdAt).toLocaleString('vi-VN')}
+                    {editingOrder.createdBy && (
+                      <span className="ml-2 pl-2 border-l border-slate-300">
+                        Tạo bởi: {editingOrder.createdBy}
+                      </span>
+                    )}
+                    {editingOrder.paidBy && editingOrder.paymentStatus === 'paid' && (
+                      <span className="ml-2 pl-2 border-l border-slate-300">
+                        Thu bởi: {editingOrder.paidBy}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -3869,9 +4179,12 @@ export default function AdminPanel({
 
       {/* 6. CUSTOMER VIEW */}
       {activeTab === 'customers' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in text-xs">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in text-xs flex flex-col">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <h2 className="font-extrabold text-xs text-slate-800 uppercase tracking-wide">Danh sách khách hàng</h2>
+            <span className="bg-orange-50 text-orange-700 text-[10px] font-bold px-2.5 py-1 rounded-full font-mono">
+              Tổng số: {customers.length} khách
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -3883,27 +4196,99 @@ export default function AdminPanel({
                   <th className="px-4 py-3 text-right">Đã Mua</th>
                   <th className="px-4 py-3 text-right">Công Nợ</th>
                   <th className="px-4 py-3">Ghi Chú</th>
+                  <th className="px-4 py-3 text-center w-28">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 font-medium font-sans">
-                {customers.map(cust => (
-                  <tr key={cust.phone} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5">
-                      <span className="font-bold text-orange-600 block text-xs font-mono tracking-wider">{cust.phone}</span>
-                      <span className="text-[10px] block">{cust.firstName}</span>
+                {paginatedCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-slate-400 font-medium">
+                      Không tìm thấy thông tin khách hàng hợp lệ nào.
                     </td>
-                    <td className="px-4 py-3.5 text-[10px] text-slate-500">{cust.address}</td>
-                    <td className="px-4 py-3.5 text-right font-bold text-slate-900">{cust.totalOrders}</td>
-                    <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-900">{cust.totalSpent.toLocaleString('vi-VN')}đ</td>
-                    <td className="px-4 py-3.5 text-right text-rose-600 font-bold font-mono">
-                      {cust.debtOrders > 0 ? `${cust.debtOrders} đơn / ${cust.debtAmount.toLocaleString('vi-VN')}đ` : '0đ'}
-                    </td>
-                    <td className="px-4 py-3.5 text-[10px] text-slate-500 italic">{cust.notes.join(', ')}</td>
                   </tr>
-                ))}
+                ) : (
+                  paginatedCustomers.map(cust => (
+                    <tr key={cust.phone} className="hover:bg-slate-50/50">
+                      <td className="px-4 py-3.5">
+                        <span className="font-bold text-orange-600 block text-xs font-mono tracking-wider">{cust.phone}</span>
+                        <span className="text-[10px] block font-semibold text-slate-800">{cust.firstName}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-[10px] text-slate-500">{cust.address || '—'}</td>
+                      <td className="px-4 py-3.5 text-right font-bold text-slate-900">{cust.totalOrders}</td>
+                      <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-900">{cust.totalSpent.toLocaleString('vi-VN')}đ</td>
+                      <td className="px-4 py-3.5 text-right text-rose-600 font-bold font-mono">
+                        {cust.debtOrders > 0 ? `${cust.debtOrders} đơn / ${cust.debtAmount.toLocaleString('vi-VN')}đ` : '0đ'}
+                      </td>
+                      <td className="px-4 py-3.5 text-[10px] text-slate-500 italic max-w-xs truncate" title={cust.notes.join('\n')}>
+                        {cust.notes.length > 0 ? cust.notes.join(' • ') : '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <div className="flex justify-center items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCustomer(cust)}
+                            className="p-1.5 hover:bg-slate-100 text-blue-600 hover:text-blue-700 rounded-lg transition-colors cursor-pointer"
+                            title="Sửa thông tin khách hàng"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomer(cust.phone)}
+                            className="p-1.5 hover:bg-rose-50 text-rose-500 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Xoá khách hàng"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* Customer list pagination bar */}
+          {totalCustomerPages > 1 && (
+            <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50 text-[11px]">
+              <span className="text-slate-500 font-semibold uppercase tracking-wider">
+                Trang {customerPage} / {totalCustomerPages} — Hiển thị {(customerPage - 1) * CUSTOMERS_PER_PAGE + 1} đến {Math.min(customerPage * CUSTOMERS_PER_PAGE, customers.length)} của {customers.length} khách hàng
+              </span>
+              <div className="flex gap-1 items-center">
+                <button
+                  type="button"
+                  disabled={customerPage === 1}
+                  onClick={() => setCustomerPage(prev => Math.max(prev - 1, 1))}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer transition-colors"
+                >
+                  Trước
+                </button>
+                {Array.from({ length: totalCustomerPages }, (_, i) => i + 1).map(pageNum => (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setCustomerPage(pageNum)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer font-mono ${
+                      customerPage === pageNum 
+                        ? 'bg-orange-600 text-white shadow-sm font-black' 
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={customerPage === totalCustomerPages}
+                  onClick={() => setCustomerPage(prev => Math.min(prev + 1, totalCustomerPages))}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer transition-colors"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -4569,7 +4954,15 @@ export default function AdminPanel({
             )}
           </div>
 
-          <div className="flex justify-end pt-3 border-t border-slate-100">
+          <div className="flex justify-end pt-3 border-t border-slate-100 items-center gap-4">
+            {saveStatus === 'success' && (
+              <span className="text-emerald-600 font-bold text-xs uppercase flex items-center gap-1">
+                <CheckCircle className="w-4 h-4" /> Đã lưu thành công
+              </span>
+            )}
+            {saveStatus && saveStatus !== 'success' && (
+              <span className="text-rose-600 font-bold text-xs uppercase">{saveStatus}</span>
+            )}
             <button
               type="submit"
               className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl transition-all shadow-md shadow-orange-100 flex items-center gap-1.5 uppercase text-[10px] tracking-wide"
@@ -4654,6 +5047,14 @@ export default function AdminPanel({
               >
                 Lưu
               </button>
+              {saveStatus === 'success' && (
+                <span className="text-emerald-600 font-bold text-xs uppercase flex items-center gap-1">
+                  Đã lưu
+                </span>
+              )}
+              {saveStatus && saveStatus !== 'success' && (
+                <span className="text-rose-600 font-bold text-xs uppercase ml-2">{saveStatus}</span>
+              )}
             </div>
           </div>
           
@@ -4668,60 +5069,6 @@ export default function AdminPanel({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               
-              {/* Option 1: Standard theme */}
-              <div 
-                onClick={() => handleThemeChange('standard')}
-                className={`border rounded-xl p-4 cursor-pointer transition-all duration-300 relative group flex flex-col justify-between min-h-[140px] ${
-                  adminTheme === 'standard' 
-                    ? 'border-orange-500 bg-orange-50/20 ring-1 ring-orange-500 shadow-sm' 
-                    : 'border-slate-205 bg-white hover:border-slate-350 hover:shadow-xs'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] bg-slate-100 text-slate-700 font-black px-2 py-0.5 rounded uppercase tracking-wider">Mặc định</span>
-                    <span className="text-xl">☀️</span>
-                  </div>
-                  <h4 className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wide">Classic Standard</h4>
-                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Nền sáng sang trọng, cam ấm áp tươi tắn, độ tương phản cao, tương thích hoàn hảo mọi thiết bị.</p>
-                </div>
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100/60">
-                  <span className="text-[9px] text-orange-600 font-bold">Classic Cam</span>
-                  <button className={`px-2.5 py-1 text-[9px] font-black uppercase rounded ${
-                    adminTheme === 'standard' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {adminTheme === 'standard' ? '✓ Đang dùng' : 'Sử dụng'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Option 2: Vista theme */}
-              <div 
-                onClick={() => handleThemeChange('vista')}
-                className={`border rounded-xl p-4 cursor-pointer transition-all duration-300 relative group flex flex-col justify-between min-h-[140px] ${
-                  adminTheme === 'vista' 
-                    ? 'border-sky-500 bg-sky-50/25 ring-1 ring-sky-500 shadow-sm' 
-                    : 'border-slate-205 bg-white hover:border-slate-350 hover:shadow-xs'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] bg-sky-100 text-sky-700 font-black px-2 py-0.5 rounded uppercase tracking-wider">Aero Glass</span>
-                    <span className="text-xl">💿</span>
-                  </div>
-                  <h4 className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wide">Windows Vista Style</h4>
-                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Hiệu ứng kính mờ Glassmorphic, dải ngọc bích đổi màu bóng bẩy, hoài niệm sang trọng.</p>
-                </div>
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100/60">
-                  <span className="text-[9px] text-sky-600 font-bold">Kính pha lê</span>
-                  <button className={`px-2.5 py-1 text-[9px] font-black uppercase rounded ${
-                    adminTheme === 'vista' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {adminTheme === 'vista' ? '✓ Đang dùng' : 'Sử dụng'}
-                  </button>
-                </div>
-              </div>
-
               {/* Option 3: Cyberpunk theme */}
               <div 
                 onClick={() => handleThemeChange('cyberpunk')}
@@ -4749,33 +5096,6 @@ export default function AdminPanel({
                 </div>
               </div>
 
-              {/* Option 4: Windows 11 theme */}
-              <div 
-                onClick={() => handleThemeChange('win11')}
-                className={`border rounded-xl p-4 cursor-pointer transition-all duration-300 relative group flex flex-col justify-between min-h-[140px] ${
-                  adminTheme === 'win11' 
-                    ? 'border-[#0078d4] bg-[#0078d4]/10 ring-1 ring-[#0078d4] shadow-sm' 
-                    : 'border-slate-205 bg-white hover:border-slate-350 hover:shadow-xs'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] bg-sky-100 text-[#0078d4] font-black px-2 py-0.5 rounded uppercase tracking-wider">Fluent Design</span>
-                    <span className="text-xl">🪟</span>
-                  </div>
-                  <h4 className="font-extrabold text-[#0078d4] text-[11px] uppercase tracking-wide">Windows 11 Style</h4>
-                  <p className="text-[10px] text-slate-405 mt-1 leading-relaxed">Giao diện Fluent Mica thanh nhã, gam màu xanh hy vọng của Microsoft, bo góc mềm mại, hiển thị trực quan.</p>
-                </div>
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100/60">
-                  <span className="text-[9px] text-[#0078d4] font-bold font-sans">Mica Xanh</span>
-                  <button className={`px-2.5 py-1 text-[9px] font-black uppercase rounded ${
-                    adminTheme === 'win11' ? 'bg-[#0078d4] text-white' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {adminTheme === 'win11' ? '✓ Đang dùng' : 'Sử dụng'}
-                  </button>
-                </div>
-              </div>
-
               {/* Option 5: Aura 2026 theme */}
               <div 
                 onClick={() => handleThemeChange('aura2026')}
@@ -4799,6 +5119,33 @@ export default function AdminPanel({
                     adminTheme === 'aura2026' ? 'bg-[#9b6bcc] text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
                     {adminTheme === 'aura2026' ? '✓ Đang dùng' : 'Sử dụng'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 6: Dai Style */}
+              <div 
+                onClick={() => handleThemeChange('dai')}
+                className={`border rounded-xl p-4 cursor-pointer transition-all duration-300 relative group flex flex-col justify-between min-h-[140px] ${
+                  adminTheme === 'dai' 
+                    ? 'border-[#7c3aed] bg-[#f5f3ff]/40 ring-1 ring-[#7c3aed] shadow-md' 
+                    : 'border-slate-205 bg-white hover:border-slate-350 hover:shadow-xs'
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] bg-[#ede9fe] text-[#7c3aed] font-black px-2 py-0.5 rounded uppercase tracking-wider">Mặc định (Dai Style)</span>
+                    <span className="text-xl">☀️</span>
+                  </div>
+                  <h4 className="font-extrabold text-[#5b21b6] text-[11px] uppercase tracking-wide">Violet Soft</h4>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Tông màu sáng nhạt, icon gradient đa sắc bồng bềnh, dễ dàng nhìn trạng thái từng loại bàn.</p>
+                </div>
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100/60">
+                  <span className="text-[9px] text-[#7c3aed] font-bold font-sans">Cute & Bright</span>
+                  <button className={`px-2.5 py-1 text-[9px] font-black uppercase rounded ${
+                    adminTheme === 'dai' ? 'bg-[#7c3aed] text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {adminTheme === 'dai' ? '✓ Đang dùng' : 'Sử dụng'}
                   </button>
                 </div>
               </div>
@@ -4918,6 +5265,77 @@ export default function AdminPanel({
 
             </div>
           </div>
+        </div>
+      )}
+
+      {/* EDIT CUSTOMER MODAL */}
+      {editingCustomer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <form onSubmit={handleSaveCustomer} className={`${t.card} w-full max-w-sm p-6 space-y-4 relative`}>
+            <div className={`flex items-center justify-between border-b ${t.divider} pb-3`}>
+              <h3 className={`font-black text-xs uppercase tracking-tight flex items-center gap-1.5 ${t.textTitle}`}>
+                <Edit3 className={`w-4 h-4 ${t.icon}`} />
+                Chỉnh sửa khách hàng
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setEditingCustomer(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer text-xs font-black"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Họ và Tên *</label>
+                <input
+                  type="text"
+                  required
+                  value={editCustName}
+                  onChange={(e) => setEditCustName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 outline-none focus:bg-white text-xs shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Số điện thoại *</label>
+                <input
+                  type="text"
+                  required
+                  value={editCustPhone}
+                  onChange={(e) => setEditCustPhone(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 outline-none focus:bg-white text-xs font-mono shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">Địa chỉ (nếu có)</label>
+                <input
+                  type="text"
+                  value={editCustAddress}
+                  onChange={(e) => setEditCustAddress(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 outline-none focus:bg-white text-xs shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div className={`flex justify-end gap-2 border-t ${t.divider} pt-3.5`}>
+              <button
+                type="button"
+                onClick={() => setEditingCustomer(null)}
+                className={`${t.btnSec} text-xs py-2 px-4 rounded-xl cursor-pointer`}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                className={`${t.btnPri} text-xs py-2 px-4 rounded-xl cursor-pointer bg-orange-600 text-white hover:bg-orange-700`}
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

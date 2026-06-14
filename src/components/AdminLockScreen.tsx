@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Lock, ShieldAlert, CheckCircle2, Delete } from 'lucide-react';
 
 interface AdminLockScreenProps {
-  onSuccess: () => void;
+  onSuccess: (authenticatedStaff: any) => void;
   onCancel?: () => void;
+  staffList?: any[];
   adminPin?: string;
 }
 
-export default function AdminLockScreen({ onSuccess, onCancel, adminPin = '1111' }: AdminLockScreenProps) {
+export default function AdminLockScreen({ onSuccess, onCancel, staffList = [], adminPin }: AdminLockScreenProps) {
   const [pin, setPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [authenticatedStaff, setAuthenticatedStaff] = useState<any>(null);
 
   // Match physical keyboard input
   useEffect(() => {
@@ -29,21 +31,36 @@ export default function AdminLockScreen({ onSuccess, onCancel, adminPin = '1111'
   }, [pin, isSuccess]);
 
   const handleDigit = (digit: string) => {
-    if (pin.length >= (adminPin.length || 4)) return;
+    if (pin.length >= 4) return; // Assume 4 digit PIN
     setErrorMsg('');
     const newPin = pin + digit;
     setPin(newPin);
 
-    if (newPin.length === (adminPin.length || 4)) {
+    if (newPin.length === 4) {
       // Evaluate instantly once digits are typed
-      if (newPin === adminPin) {
+      let foundStaff = staffList.find(s => s.pin === newPin || s.password === newPin);
+      
+      // System fallback / Master PIN 
+      // Allow custom adminPin or default fallback PIN 1506
+      if (!foundStaff && ((adminPin && newPin === adminPin) || newPin === '1506')) {
+         foundStaff = staffList.length > 0 ? staffList.find(s => s.role === 'Quản lý') || staffList[0] : {
+            id: 'master-admin',
+            fullName: 'Quản trị viên',
+            username: 'admin',
+            role: 'Quản lý',
+            pin: newPin
+         };
+      }
+
+      if (foundStaff) {
+        setAuthenticatedStaff(foundStaff);
         setIsSuccess(true);
         setTimeout(() => {
-          onSuccess();
+          onSuccess(foundStaff);
         }, 600);
       } else {
         setTimeout(() => {
-          setErrorMsg('Mật mã không đúng! Vui lòng thử lại.');
+          setErrorMsg('Mã PIN không đúng!');
           setPin('');
         }, 200);
       }
@@ -83,10 +100,10 @@ export default function AdminLockScreen({ onSuccess, onCancel, adminPin = '1111'
 
         {/* Text descriptions */}
         <h2 className="text-xl font-black tracking-tight text-white uppercase text-center">
-          {isSuccess ? 'Xác thực thành công' : 'Chủ tiệm Đăng nhập'}
+          {isSuccess ? 'Xác thực thành công' : 'Nhân viên Đăng nhập'}
         </h2>
         <p className="text-slate-400 text-xs font-medium text-center mt-1.5 px-3 leading-relaxed">
-          Khu vực quản trị chỉ dành riêng cho Chủ Nhà Hàng. Hãy nhập mật mã bảo mật để tiếp tục.
+          Khu vực làm việc dành cho Nhân viên hoặc Quản lý. Hãy nhập mã số bảo mật để tiếp tục.
         </p>
 
         {/* PIN Indicators boxes with dots */}

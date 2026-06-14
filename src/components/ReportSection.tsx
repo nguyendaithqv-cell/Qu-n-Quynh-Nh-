@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Product, Order, Category, StoreConfig } from '../types';
-import { Calendar, Clock, TrendingUp, FileSpreadsheet, Info, Sparkles, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, TrendingUp, FileSpreadsheet, Info, Sparkles, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, DollarSign, ShoppingBag, Utensils, BarChart2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportSectionProps {
@@ -137,23 +137,34 @@ export default function ReportSection({ products, orders, categories, storeConfi
       grand: { revenue:0, cost:0, profit:0, qty:0 }
     });
 
-    // Calculate cash, banking and discount totals for completed orders
+    // Calculate totals and order counts
     let cashRevenue = 0;
     let bankingRevenue = 0;
     let totalDiscount = 0;
+    
+    let totalCompletedOrders = 0;
+    let pendingOrdersCount = 0;
+    let preparingOrdersCount = 0;
 
     orders
-      .filter(o => o.status === 'completed' && isOrderInTimeRange(o.createdAt))
+      .filter(o => isOrderInTimeRange(o.createdAt))
       .forEach(o => {
-        totalDiscount += o.discountAmount || 0;
-        if (o.paymentMethod === 'banking') {
-          bankingRevenue += o.totalAmount;
-        } else {
-          cashRevenue += o.totalAmount;
+        if (o.status === 'completed') {
+          totalCompletedOrders++;
+          totalDiscount += o.discountAmount || 0;
+          if (o.paymentMethod === 'banking') {
+            bankingRevenue += o.totalAmount;
+          } else {
+            cashRevenue += o.totalAmount;
+          }
+        } else if (o.status === 'pending') {
+          pendingOrdersCount++;
+        } else if (o.status === 'preparing') {
+          preparingOrdersCount++;
         }
       });
 
-    return { salesArray, totals, cashRevenue, bankingRevenue, totalDiscount };
+    return { salesArray, totals, cashRevenue, bankingRevenue, totalDiscount, totalCompletedOrders, pendingOrdersCount, preparingOrdersCount };
   }, [orders, products, categories, timeRange, startDate, endDate]);
 
   // Handle head click for sorting
