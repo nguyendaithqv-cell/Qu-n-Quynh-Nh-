@@ -52,6 +52,8 @@ export interface OrderItem {
   productName: string;
   quantity: number;
   priceOnOrder: number;
+  status?: 'pending' | 'preparing' | 'completed'; // Trạng thái riêng lẻ của món
+  isNew?: boolean; // Đánh dấu món mới gọi thêm
 }
 
 export type OrderStatus = 'pending' | 'preparing' | 'delivering' | 'completed' | 'cancelled';

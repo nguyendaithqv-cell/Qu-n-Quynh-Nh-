@@ -17,6 +17,7 @@ import {
 import MobileSimulator from './components/MobileSimulator';
 import AdminPanel from './components/AdminPanel';
 import AdminLockScreen from './components/AdminLockScreen';
+import KitchenPanel from './components/KitchenPanel';
 import { 
   Sparkles, 
   Smartphone, 
@@ -43,7 +44,8 @@ import {
   Download,
   ExternalLink,
   Share2,
-  MoreVertical
+  MoreVertical,
+  ChefHat
 } from 'lucide-react';
 import CashierPOS from './components/CashierPOS';
 import { 
@@ -89,6 +91,7 @@ export default function App() {
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(false);
   const [authenticatedStaff, setAuthenticatedStaff] = useState<Staff | null>(null);
   const isAdminAuthenticated = !!authenticatedStaff;
+  const [showKitchenPanel, setShowKitchenPanel] = useState(false);
   const [adminViewMode, setAdminViewMode] = useState<'picker' | 'admin' | 'cashier'>('picker');
 
   // A2HS (Add to Home screen) PWA states
@@ -1074,6 +1077,8 @@ export default function App() {
               orders={orders}
               isAdminAuthenticated={isAdminAuthenticated}
             />
+          ) : showKitchenPanel ? (
+            <KitchenPanel onBack={() => setShowKitchenPanel(false)} />
           ) : !isAdminAuthenticated ? (
             <div className="bg-slate-900 min-h-screen pb-16 flex flex-col justify-center">
               <AdminLockScreen 
@@ -1081,6 +1086,7 @@ export default function App() {
                   setAuthenticatedStaff(staff);
                   setAdminViewMode('picker');
                 }}
+                onKitchenPIN={() => setShowKitchenPanel(true)}
                 onCancel={() => setMobileMode('client')}
                 staffList={storeConfig.staff || []}
                 adminPin={storeConfig.adminPin}
@@ -1361,67 +1367,72 @@ export default function App() {
     <div className="w-full h-screen flex bg-slate-50 overflow-hidden font-sans text-slate-800">
       
       {/* 1. Left Navigation Control Sidebar */}
-      <nav className="w-20 bg-orange-600 flex flex-col items-center py-8 justify-between border-r border-orange-700 shrink-0">
-        
-        <div className="flex flex-col items-center gap-10">
-          {/* Logo brand */}
-          <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center font-black text-orange-600 text-lg shadow-lg border border-orange-100 select-none cursor-default">
-            {logoInfo.initials}
-            <span className="text-[7px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">{logoInfo.subtitle}</span>
-          </div>
- 
-          {/* Quick Menu Icons (Stylized layout decorations) */}
-          <div className="flex flex-col gap-5">
-            <div 
-              className="p-3 bg-orange-500 rounded-xl text-white shadow-md shadow-orange-700/55 cursor-pointer hover:bg-orange-400 transition-all group relative"
-              title="Tổng quản trị viên"
-            >
-              <Database className="w-5 h-5" />
-              <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50 shadow-xs">
-                Hệ_Thống
+      {!showKitchenPanel && (
+        <nav className="w-20 bg-orange-600 flex flex-col items-center py-8 justify-between border-r border-orange-700 shrink-0">
+          
+          <div className="flex flex-col items-center gap-10">
+            {/* Logo brand */}
+            <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center font-black text-orange-600 text-lg shadow-lg border border-orange-100 select-none cursor-default">
+              {logoInfo.initials}
+              <span className="text-[7px] text-orange-800 font-extrabold uppercase tracking-tighter block -mt-1">{logoInfo.subtitle}</span>
+            </div>
+   
+            {/* Quick Menu Icons (Stylized layout decorations) */}
+            <div className="flex flex-col gap-5">
+              <div 
+                className="p-3 bg-orange-500 rounded-xl text-white shadow-md shadow-orange-700/55 cursor-pointer hover:bg-orange-400 transition-all group relative"
+                title="Tổng quản trị viên"
+              >
+                <Database className="w-5 h-5" />
+                <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50 shadow-xs">
+                  Hệ_Thống
+                </div>
+              </div>
+   
+              <div 
+                className="p-3 text-orange-200 hover:text-white rounded-xl hover:bg-orange-500 transition-all cursor-pointer group relative"
+                title="Đồng bộ sản phẩm"
+              >
+                <Sparkles className="w-5 h-5" />
+                <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50">
+                  Làm_Mới
+                </div>
+              </div>
+   
+              <div 
+                className="p-3 text-orange-200 hover:text-white rounded-xl hover:bg-orange-500 transition-all cursor-pointer group relative"
+                onClick={() => alert(`QR Hotline Zalo hỗ trợ: ${storeConfig.zaloHotline}`)}
+                title="Liên hệ Hotline"
+              >
+                <Settings className="w-5 h-5" />
+                <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50">
+                  Thông_Tin
+                </div>
               </div>
             </div>
- 
-            <div 
-              className="p-3 text-orange-200 hover:text-white rounded-xl hover:bg-orange-500 transition-all cursor-pointer group relative"
-              title="Đồng bộ sản phẩm"
-            >
-              <Sparkles className="w-5 h-5" />
-              <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50">
-                Làm_Mới
-              </div>
-            </div>
- 
-            <div 
-              className="p-3 text-orange-200 hover:text-white rounded-xl hover:bg-orange-500 transition-all cursor-pointer group relative"
-              onClick={() => alert(`QR Hotline Zalo hỗ trợ: ${storeConfig.zaloHotline}`)}
-              title="Liên hệ Hotline"
-            >
-              <Settings className="w-5 h-5" />
-              <div className="absolute left-16 bg-slate-900 text-white rounded p-1 text-[9px] uppercase font-bold tracking-wider hidden group-hover:block z-50">
-                Thông_Tin
-              </div>
+          </div>
+   
+          {/* Profile Avatar mimic decoration */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-orange-500/80 border-2 border-orange-400/50 shadow-inner flex items-center justify-center text-white font-bold select-none text-sm uppercase">
+              AD
             </div>
           </div>
-        </div>
- 
-        {/* Profile Avatar mimic decoration */}
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-orange-500/80 border-2 border-orange-400/50 shadow-inner flex items-center justify-center text-white font-bold select-none text-sm uppercase">
-            AD
-          </div>
-        </div>
- 
-      </nav>
+   
+        </nav>
+      )}
  
       {/* 2. Middle Main Custom Admin Workspace Pane */}
       <div className="flex-1 flex flex-col bg-slate-50/50 overflow-hidden relative">
-        {!isAdminAuthenticated ? (
+        {showKitchenPanel ? (
+          <KitchenPanel onBack={() => setShowKitchenPanel(false)} />
+        ) : !isAdminAuthenticated ? (
           <AdminLockScreen 
             onSuccess={(staff) => {
               setAuthenticatedStaff(staff);
               setAdminViewMode('picker');
             }}
+            onKitchenPIN={() => setShowKitchenPanel(true)}
             staffList={storeConfig.staff || []}
             adminPin={storeConfig.adminPin}
           />
@@ -1452,63 +1463,65 @@ export default function App() {
       </div>
 
       {/* 3. Right Sidebar: Mobile Smartphone Simulator Preview */}
-      <div className="w-[380px] bg-slate-100/90 flex flex-col items-center justify-center p-6 border-l border-slate-200 shrink-0">
-        
-        {/* Helper title above mockup */}
-        <div className="w-[332px] text-center mb-3">
-          <h2 className="text-xs font-black text-slate-500 tracking-wider uppercase flex items-center justify-center gap-1">
-            <Smartphone className="w-4 h-4 text-orange-600" /> Giả Lập Ứng Dụng Điện Thoại
-          </h2>
-          <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
-            Khách hàng đặt món phía dưới sẽ tự động chuyển hóa đơn tới Admin bên trái ngay lập tức!
-          </p>
-        </div>
-
-        {/* Smartphone Hardware Frame Model Mockup */}
-        <div className="w-[332px] h-[670px] bg-white rounded-[44px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.22)] border-[10px] border-slate-900 relative overflow-hidden flex flex-col select-none ring-1 ring-slate-950/5">
+      {!showKitchenPanel && (
+        <div className="w-[380px] bg-slate-100/90 flex flex-col items-center justify-center p-6 border-l border-slate-200 shrink-0">
           
-          {/* Smartphone Top Speaker and camera notch */}
-          <div className="absolute top-0 inset-x-0 h-6 bg-transparent flex justify-center items-start z-50 pointer-events-none">
-            <div className="w-28 h-4.5 bg-slate-900 rounded-b-xl flex items-center justify-center gap-1.5 px-3">
-              {/* Camera lens */}
-              <span className="w-2 h-2 rounded-full bg-slate-800"></span>
-              {/* Speaker bar */}
-              <span className="w-10 h-1 bg-slate-800 rounded-full"></span>
+          {/* Helper title above mockup */}
+          <div className="w-[332px] text-center mb-3">
+            <h2 className="text-xs font-black text-slate-500 tracking-wider uppercase flex items-center justify-center gap-1">
+              <Smartphone className="w-4 h-4 text-orange-600" /> Giả Lập Ứng Dụng Điện Thoại
+            </h2>
+            <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+              Khách hàng đặt món phía dưới sẽ tự động chuyển hóa đơn tới Admin bên trái ngay lập tức!
+            </p>
+          </div>
+
+          {/* Smartphone Hardware Frame Model Mockup */}
+          <div className="w-[332px] h-[670px] bg-white rounded-[44px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.22)] border-[10px] border-slate-900 relative overflow-hidden flex flex-col select-none ring-1 ring-slate-950/5">
+            
+            {/* Smartphone Top Speaker and camera notch */}
+            <div className="absolute top-0 inset-x-0 h-6 bg-transparent flex justify-center items-start z-50 pointer-events-none">
+              <div className="w-28 h-4.5 bg-slate-900 rounded-b-xl flex items-center justify-center gap-1.5 px-3">
+                {/* Camera lens */}
+                <span className="w-2 h-2 rounded-full bg-slate-800"></span>
+                {/* Speaker bar */}
+                <span className="w-10 h-1 bg-slate-800 rounded-full"></span>
+              </div>
             </div>
+
+            {/* Screen Content embedded frame */}
+            <div className="flex-1 overflow-hidden relative bg-slate-50 flex flex-col">
+              <MobileSimulator
+                products={products}
+                categories={categories}
+                promotions={promotions}
+                storeConfig={storeConfig}
+                tables={tables}
+                onUpdateTables={handleUpdateTables}
+                onAddOrder={handleAddOrder}
+                isStandaloneMobile={false}
+                orders={orders}
+                isAdminAuthenticated={isAdminAuthenticated}
+              />
+            </div>
+
+            {/* Smartphone Hardware bottom Home slide indicator bar */}
+            <div className="h-4 bg-white flex items-center justify-center shrink-0 border-t border-slate-50/50">
+              <div className="h-1 w-24 bg-slate-800 rounded-full"></div>
+            </div>
+
           </div>
 
-          {/* Screen Content embedded frame */}
-          <div className="flex-1 overflow-hidden relative bg-slate-50 flex flex-col">
-            <MobileSimulator
-              products={products}
-              categories={categories}
-              promotions={promotions}
-              storeConfig={storeConfig}
-              tables={tables}
-              onUpdateTables={handleUpdateTables}
-              onAddOrder={handleAddOrder}
-              isStandaloneMobile={false}
-              orders={orders}
-              isAdminAuthenticated={isAdminAuthenticated}
-            />
-          </div>
-
-          {/* Smartphone Hardware bottom Home slide indicator bar */}
-          <div className="h-4 bg-white flex items-center justify-center shrink-0 border-t border-slate-50/50">
-            <div className="h-1 w-24 bg-slate-800 rounded-full"></div>
+          {/* Instruction footer banner */}
+          <div className="bg-orange-50/80 rounded-xl p-2.5 px-4 max-w-[320px] border border-orange-100/70 mt-3 text-center">
+            <p className="text-[9.5px] leading-relaxed text-slate-500">
+              💡 <strong className="text-orange-600 uppercase font-black text-[9px] tracking-wide block mb-0.5">Đặt Hàng Thử Nghiệm:</strong> 
+              Chọn món trên điện thoại sọc phải, điền thông tin và bấm đặt hàng. Sau đó quét lấy Zalo sao chép bill, đồng thời kiểm chứng bảng Admin bên trái tăng vù vù nhé!
+            </p>
           </div>
 
         </div>
-
-        {/* Instruction footer banner */}
-        <div className="bg-orange-50/80 rounded-xl p-2.5 px-4 max-w-[320px] border border-orange-100/70 mt-3 text-center">
-          <p className="text-[9.5px] leading-relaxed text-slate-500">
-            💡 <strong className="text-orange-600 uppercase font-black text-[9px] tracking-wide block mb-0.5">Đặt Hàng Thử Nghiệm:</strong> 
-            Chọn món trên điện thoại sọc phải, điền thông tin và bấm đặt hàng. Sau đó quét lấy Zalo sao chép bill, đồng thời kiểm chứng bảng Admin bên trái tăng vù vù nhé!
-          </p>
-        </div>
-
-      </div>
+      )}
 
     </div>
   );
