@@ -4,15 +4,21 @@ import { Lock, ShieldAlert, CheckCircle2, Delete } from 'lucide-react';
 interface AdminLockScreenProps {
   onSuccess: (authenticatedStaff: any) => void;
   onCancel?: () => void;
+  onKitchenPIN?: () => void;
   staffList?: any[];
   adminPin?: string;
 }
 
-export default function AdminLockScreen({ onSuccess, onCancel, staffList = [], adminPin }: AdminLockScreenProps) {
+export default function AdminLockScreen({ onSuccess, onCancel, onKitchenPIN, staffList = [], adminPin }: AdminLockScreenProps) {
   const [pin, setPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [authenticatedStaff, setAuthenticatedStaff] = useState<any>(null);
+  const kitchenPinRef = React.useRef(onKitchenPIN);
+
+  useEffect(() => {
+    kitchenPinRef.current = onKitchenPIN;
+  }, [onKitchenPIN]);
 
   // Match physical keyboard input
   useEffect(() => {
@@ -37,6 +43,14 @@ export default function AdminLockScreen({ onSuccess, onCancel, staffList = [], a
     setPin(newPin);
 
     if (newPin.length === 4) {
+      if (kitchenPinRef.current && newPin === '0099') {
+        setIsSuccess(true);
+        setTimeout(() => {
+          if (kitchenPinRef.current) kitchenPinRef.current();
+        }, 600);
+        return;
+      }
+      
       // Evaluate instantly once digits are typed
       let foundStaff = staffList.find(s => s.pin === newPin || s.password === newPin);
       
