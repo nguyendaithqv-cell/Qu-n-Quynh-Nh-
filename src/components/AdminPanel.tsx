@@ -6987,12 +6987,14 @@ export default function AdminPanel({
             orders={orders}
             tables={tables}
             areas={areas}
+            inventoryReceipts={inventoryReceipts}
             onUpdateOrders={onUpdateOrders}
             onUpdateProducts={onUpdateProducts}
             onUpdateCategories={onUpdateCategories}
             onUpdatePromotions={onUpdatePromotions}
             onUpdateTables={onUpdateTables}
             onUpdateAreas={onUpdateAreas}
+            onUpdateInventoryReceipts={onUpdateInventoryReceipts}
             onUpdateStoreConfig={onUpdateStoreConfig}
             themeStyles={t}
           />
