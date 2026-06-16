@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Save, Upload, AlertCircle, Loader2 } from 'lucide-react';
-import { Product, Category, Order, Promotion, Table, Area, StoreConfig } from '../types';
+import { Product, Category, Order, Promotion, Table, Area, StoreConfig, InventoryReceipt } from '../types';
 import { doc, setDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -12,19 +12,21 @@ interface BackupRestoreProps {
   orders: Order[];
   tables: Table[];
   areas: Area[];
+  inventoryReceipts: InventoryReceipt[];
   onUpdateOrders: (orders: Order[]) => void;
   onUpdateProducts: (products: Product[]) => void;
   onUpdateCategories: (categories: Category[]) => void;
   onUpdatePromotions: (promotions: Promotion[]) => void;
   onUpdateTables: (tables: Table[]) => void;
   onUpdateAreas: (areas: Area[]) => void;
+  onUpdateInventoryReceipts: (receipts: InventoryReceipt[]) => void;
   onUpdateStoreConfig: (config: StoreConfig) => void;
   themeStyles: any;
 }
 
 export default function BackupRestore({
-  products, categories, promotions, storeConfig, orders, tables, areas,
-  onUpdateOrders, onUpdateProducts, onUpdateCategories, onUpdatePromotions, onUpdateTables, onUpdateAreas, onUpdateStoreConfig,
+  products, categories, promotions, storeConfig, orders, tables, areas, inventoryReceipts,
+  onUpdateOrders, onUpdateProducts, onUpdateCategories, onUpdatePromotions, onUpdateTables, onUpdateAreas, onUpdateInventoryReceipts, onUpdateStoreConfig,
   themeStyles: t
 }: BackupRestoreProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,6 +49,7 @@ export default function BackupRestore({
         orders, 
         tables, 
         areas, 
+        inventoryReceipts,
         activityLogs,
         backupDate: new Date().toISOString()
       };
@@ -100,6 +103,7 @@ export default function BackupRestore({
             { col: 'orders', items: data.orders || [] },
             { col: 'tables', items: data.tables || [] },
             { col: 'areas', items: data.areas || [] },
+            { col: 'inventoryReceipts', items: data.inventoryReceipts || [] },
             { col: 'activityLogs', items: data.activityLogs || [] },
         ];
         
@@ -142,6 +146,7 @@ export default function BackupRestore({
         onUpdateOrders(data.orders || []);
         onUpdateTables(data.tables || []);
         onUpdateAreas(data.areas || []);
+        onUpdateInventoryReceipts(data.inventoryReceipts || []);
         
         setProgress(100);
         alert("Phục hồi dữ liệu thành công!");
