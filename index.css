@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+}
+
+/* Custom scrollbars for geometric visual perfection */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Hide scrollbars for full screen/simulator views if needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* ---------------------------------------------------------
+   PRINT OPTIMIZATION: Thermal Receipt Printer logic
+   --------------------------------------------------------- */
+@media print {
+  /* Hide every part of the standard UI */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Show only the thermal receipt container */
+  #thermal-receipt-content, #thermal-receipt-content * {
+    visibility: visible !important;
+  }
+
+  /* Force the receipt to the static top-left with no surrounding gaps */
+  #thermal-receipt-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important; /* Standard 80mm POS Thermal Width */
+    margin: 0 !important;
+    padding: 10mm !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Hide headers, footers, and URL bars injected by browsers if possible */
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  /* Specific adjustments for POS printing */
+  #thermal-receipt-content h1, 
+  #thermal-receipt-content h2 {
+    color: black !important;
+  }
+}
+
