@@ -935,7 +935,7 @@ export default function AdminPanel({
 
       data.forEach((row) => {
         const catName = row['Tên Danh Mục'] || row['Danh mục'] || 'Chưa phân loại';
-        const catId = row['Danh mục ID'];
+        const catId = row['Mã Danh Mục'] || row['Danh mục ID'];
         let category = updatedCategories.find(c => c.name === catName || (catId && c.id === catId));
         
         if (!category) {
@@ -959,24 +959,38 @@ export default function AdminPanel({
         const prodName = row['Tên món'];
         let product = updatedProducts.find(p => p.name === prodName || p.id === row['ID']);
         if (product) {
-          product.price = Number(row['Giá (VND)']);
-          product.cost = Number(row['Giá vốn (VND)']) || 0;
+          product.price = Number(row['Giá'] || row['Giá (VND)']);
+          product.cost = Number(row['Giá vốn'] || row['Giá vốn (VND)']) || 0;
           product.description = row['Mô tả'] || '';
           product.categoryId = category!.id;
           product.isAvailable = row['Trạng thái'] !== 'Hết món';
-          product.isVisibleToCustomer = row['Hiển thị cho khách'] !== 'Không';
+          product.isVisibleToCustomer = (row['Hiển thị'] || row['Hiển thị cho khách']) !== 'Không';
           product.image = row['Emoji'] || '🍜';
+          try {
+            product.recipe = row['Định lượng'] ? JSON.parse(row['Định lượng']) : [];
+          } catch (e) {
+            console.error("Error parsing recipe:", e);
+            product.recipe = [];
+          }
         } else {
           updatedProducts.push({
             id: row['ID'] || `prod-${Date.now()}-${Math.random()}`,
             name: prodName,
-            price: Number(row['Giá (VND)']),
-            cost: Number(row['Giá vốn (VND)']) || 0,
+            price: Number(row['Giá'] || row['Giá (VND)']),
+            cost: Number(row['Giá vốn'] || row['Giá vốn (VND)']) || 0,
             description: row['Mô tả'] || '',
             categoryId: category!.id,
             isAvailable: row['Trạng thái'] !== 'Hết món',
-            isVisibleToCustomer: row['Hiển thị cho khách'] !== 'Không',
-            image: row['Emoji'] || '🍜'
+            isVisibleToCustomer: (row['Hiển thị'] || row['Hiển thị cho khách']) !== 'Không',
+            image: row['Emoji'] || '🍜',
+            recipe: (() => {
+              try {
+                return row['Định lượng'] ? JSON.parse(row['Định lượng']) : [];
+              } catch (e) {
+                console.error("Error parsing recipe:", e);
+                return [];
+              }
+            })()
           });
         }
       });
@@ -994,14 +1008,15 @@ export default function AdminPanel({
       return {
         'ID': product.id,
         'Tên món': product.name,
-        'Danh mục ID': product.categoryId,
+        'Mã Danh Mục': product.categoryId,
         'Tên Danh Mục': cat?.name || 'Không xác định',
-        'Giá (VND)': product.price,
-        'Giá vốn (VND)': product.cost || 0,
+        'Giá': product.price,
+        'Giá vốn': product.cost || 0,
         'Mô tả': product.description,
         'Trạng thái': product.isAvailable ? 'Sẵn sàng' : 'Hết món',
-        'Hiển thị cho khách': (product.isVisibleToCustomer ?? true) ? 'Có' : 'Không',
-        'Emoji': product.image
+        'Hiển thị': (product.isVisibleToCustomer ?? true) ? 'Có' : 'Không',
+        'Emoji': product.image,
+        'Định lượng': JSON.stringify(product.recipe || [])
       };
     });
     const worksheet = XLSX.utils.json_to_sheet(data);
